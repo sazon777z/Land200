@@ -57,9 +57,14 @@ const char index_html[] PROGMEM = R"rawliteral(
                         <option value="4">Бип тревоги</option>
                     </select>
                 </div>
+                <div class="control-group">
+                    <label for="alarmVolumeRange">Громкость будильника</label>
+                    <input type="range" id="alarmVolumeRange" min="0" max="30" value="20">
+                </div>
                 <div class="button-group">
-                    <button class="btn btn-primary" id="saveAlarmBtn">Сохранить</button>
-                    <button class="btn btn-secondary" id="testSoundBtn">Тест звука</button>
+                    <button class="btn btn-primary" id="saveAlarmBtn">Сохранить время</button>
+                    <button class="btn btn-secondary" id="testSoundBtn">Тест</button>
+                    <button class="btn btn-danger" id="stopSoundBtn">Стоп</button>
                 </div>
             </section>
 
@@ -283,11 +288,13 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('saveWifiBtn').addEventListener('click', saveWifi);
     document.getElementById('saveLocBtn').addEventListener('click', saveLoc);
     document.getElementById('testSoundBtn').addEventListener('click', testSound);
+    document.getElementById('stopSoundBtn').addEventListener('click', stopSound);
     document.getElementById('rebootBtn').addEventListener('click', rebootSystem);
     document.getElementById('ledEffect').addEventListener('change', (e) => { setLedEffect(e.target.value); });
     document.getElementById('ledColor').addEventListener('input', (e) => { setLedColor(e.target.value); });
     document.getElementById('ledBrightRange').addEventListener('input', (e) => { setLedBrightness(e.target.value); });
     document.getElementById('ledSpeedRange').addEventListener('input', (e) => { setLedSpeed(e.target.value); });
+    document.getElementById('alarmVolumeRange').addEventListener('input', (e) => { setAlarmVolume(e.target.value); });
     document.getElementById('dispBrightRange').addEventListener('input', (e) => { setDisplayBrightness(e.target.value); });
     document.getElementById('turnSignal').addEventListener('change', (e) => { setTurnSignal(e.target.value); });
     document.getElementById('frontLightsBtn').addEventListener('click', toggleFront);
@@ -378,6 +385,9 @@ async function fetchStatus() {
         if(document.activeElement !== document.getElementById('weatherCity') && data.city) {
              document.getElementById('weatherCity').value = data.city;
         }
+        if(document.activeElement !== document.getElementById('alarmVolumeRange') && data.alarm_volume !== undefined) {
+             document.getElementById('alarmVolumeRange').value = data.alarm_volume;
+        }
 
     } catch (error) {
         document.getElementById('connectionStatus').className = 'status-indicator';
@@ -420,6 +430,12 @@ async function saveLoc() {
 async function testSound() {
     const sound = document.getElementById('alarmSound').value;
     fetch('/api/sound/test?id=' + sound);
+}
+async function stopSound() {
+    fetch('/api/sound/stop');
+}
+async function setAlarmVolume(val) {
+    fetch('/api/settings/alarm_volume?val=' + val);
 }
 async function setLedBrightness(val) {
     fetch('/api/settings/led_bright?val=' + val);

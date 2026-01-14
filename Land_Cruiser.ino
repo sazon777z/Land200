@@ -20,11 +20,12 @@ TaskHandle_t TaskNetworkHandle;
 // Button Check
 void checkButton() {
     if (digitalRead(PIN_BUTTON) == LOW) { // Active Low
-        delay(50); // Debounce
+        delay(30); // Quick debounce
         if (digitalRead(PIN_BUTTON) == LOW) {
+            Serial.println("Button Pressed: Stopping Sound");
             audio.stop();
             led.setModeIdle();
-            // TODO: Stop alarm logic
+            while(digitalRead(PIN_BUTTON) == LOW) delay(10); // Wait for release
         }
     }
 }
@@ -37,6 +38,9 @@ void TaskDisplay(void *pvParameters) {
             // Show AP Info and QR Code
             display.drawAPInfo(network.getApSSID(), network.getApPassword(), network.getIpAddress());
             vTaskDelay(5000 / portTICK_PERIOD_MS); // Refresh less often
+        } else if (!network.isConnected()) {
+            // This state is briefly covered by initialization, but good for stability
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
         } else {
             // Normal Operation
             display.drawClock(network.getHour(), network.getMinute(), network.getSecond());
@@ -50,7 +54,16 @@ void TaskNetwork(void *pvParameters) {
     (void) pvParameters;
     for (;;) {
         network.update();
-        vTaskDelay(100 / portTICK_PERIOD_MS); // Periodic check
+        
+        // Check for alarm trigger
+        if (network.checkAlarmTrigger()) {
+            Serial.println("ALARM TRIGGERED!");
+            audio.setVolume(network.getAlarmVolume());
+            audio.playTrack(network.getAlarmSoundId());
+            led.setModeAlarm();
+        }
+        
+        vTaskDelay(500 / portTICK_PERIOD_MS); 
     }
 }
 
@@ -66,7 +79,11 @@ void setup() {
     led.begin();
     display.begin();
     audio.begin();
-    network.begin(); // Connects to WiFi
+    
+    // Show connecting status on screen
+    display.drawConnecting(WIFI_SSID); 
+    
+    network.begin(); // Connects to WiFi (blocking up to 20s)
     
     // Initialize Web Server (after Network)
     web.begin();

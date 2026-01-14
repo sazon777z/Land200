@@ -51,6 +51,14 @@ void WebManager::setupRoutes() {
         doc["tz"] = net->getTimeZoneOffset();
         doc["city"] = net->getWeatherCity();
         
+        // Alarm info
+        char alarmTime[6];
+        sprintf(alarmTime, "%02d:%02d", net->getAlarmHour(), net->getAlarmMinute());
+        doc["alarm_time"] = String(alarmTime);
+        doc["alarm_sound"] = net->getAlarmSoundId();
+        doc["alarm_volume"] = net->getAlarmVolume();
+        doc["alarm_enabled"] = net->isAlarmEnabled();
+        
         String response;
         serializeJson(doc, response);
         server.send(200, "application/json", response);
@@ -60,8 +68,16 @@ void WebManager::setupRoutes() {
     server.on("/api/sound/test", HTTP_GET, [this](){
         if (server.hasArg("id")) {
             int soundId = server.arg("id").toInt();
+            audio->setVolume(net->getAlarmVolume()); // Use current alarm volume for test
             audio->playTrack(soundId);
         }
+        server.send(200, "text/plain", "OK");
+    });
+
+    // API Sound Stop
+    server.on("/api/sound/stop", HTTP_GET, [this](){
+        audio->stop();
+        led->setModeIdle(); // Also stop alarm LED effect if active
         server.send(200, "text/plain", "OK");
     });
 
@@ -71,9 +87,18 @@ void WebManager::setupRoutes() {
             String body = server.arg("plain");
             DynamicJsonDocument doc(1024);
             deserializeJson(doc, body);
-            String time = doc["time"];
+            
+            String time = doc["time"]; // Format "HH:MM"
             int sound = doc["sound"];
-            // TODO: Save logic
+            bool enabled = doc["enabled"] | true; // Default to true if not sent
+            
+            int h = 0, m = 0;
+            if (time.length() == 5) {
+                h = time.substring(0, 2).toInt();
+                m = time.substring(3, 5).toInt();
+            }
+            
+            net->saveAlarm(h, m, sound, enabled);
             server.send(200, "application/json", "{\"status\":\"success\"}");
         } else {
             server.send(400, "text/plain", "Bad Request");
@@ -103,6 +128,16 @@ void WebManager::setupRoutes() {
         if (server.hasArg("val")) {
              int val = server.arg("val").toInt();
              led->setSpeed(val);
+        }
+        server.send(200, "text/plain", "OK");
+    });
+
+    // API Settings Alarm Volume
+    server.on("/api/settings/alarm_volume", HTTP_GET, [this](){
+        if (server.hasArg("val")) {
+             int val = server.arg("val").toInt();
+             net->saveAlarmVolume(val);
+             audio->setVolume(val);
         }
         server.send(200, "text/plain", "OK");
     });

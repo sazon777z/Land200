@@ -4,95 +4,125 @@
 #include <Arduino.h>
 #include <Arduino_GFX_Library.h>
 
-// Премиум палитра для Версии 6
-#define CLR_SUN_BRIGHT 0xFFE0 // Ярко-желтый
-#define CLR_SUN_GLOSS  0xFFFF // Белый блик
-#define CLR_SUN_SHADOW 0xD620 // Темно-оранжевый
-#define CLR_SKY_BLUE   0x5ADF // Небесно-голубой
-#define CLR_DEEP_BLUE  0x0019 // Глубокий синий
-#define CLR_WHITE      0xFFFF // Чистый белый
-#define CLR_LGRAY      0xDEFB // Светло-серый
+// Современная палитра для версии «Kawaii»
+#define CLR_SUN_MAIN   0xFD00 // Насыщенный желтый
+#define CLR_SUN_ORANGE 0xFB00 // Оранжевый контур/тень
+#define CLR_MOON_MAIN  0xFFE0 // Светло-желтый
+#define CLR_CLOUD_MAIN 0xADFF // Голубой (тело облака)
+#define CLR_CLOUD_DARK 0x5ADF // Глубокий голубой (низ облака)
+#define CLR_WHITE      0xFFFF // Белый блик
+#define CLR_OUTLINE    0x0000 // Черный контур
+#define CLR_SNOW_FLAKE 0xDEFB // Светло-голубой для снега
 #define CLR_DGRAY      0x8410 // Серый (тень)
-#define CLR_ICE        0x9FFF // Лед
+#define CLR_DEEP_BLUE  0x0019 // Глубокий синий
 
-// Рисует глянцевое СОЛНЦЕ (Версия 6)
+// Вспомогательная функция для рисования глаз и улыбки
+void drawFace(Arduino_GFX *gfx, int cx, int cy) {
+    // Глаза
+    gfx->fillCircle(cx - 6, cy - 2, 2, CLR_OUTLINE);
+    gfx->fillCircle(cx + 6, cy - 2, 2, CLR_OUTLINE);
+    // Улыбка
+    gfx->drawCircle(cx, cy + 2, 4, CLR_OUTLINE);
+    gfx->fillRect(cx - 5, cy, 10, 5, CLR_SUN_MAIN); // Скрываем верхнюю часть круга для улыбки дугой
+}
+
+// Рисует СОЛНЫШКО с улыбкой
 void drawSunIconPremium(Arduino_GFX *gfx, int x, int y) {
-    int cx = x + 35;
-    int cy = y + 35;
+    int cx = x + 40;
+    int cy = y + 45;
     
-    // 1. Свечение (большая размытая область)
-    gfx->drawCircle(cx, cy, 32, CLR_SUN_SHADOW);
-    
-    // 2. Лучи (треугольные или линии с разной толщиной)
+    // 1. Лучи (более толстые)
     for(int i=0; i<360; i+=45) {
         float rad = i * 3.14159 / 180;
         int x1 = cx + cos(rad) * 20;
         int y1 = cy + sin(rad) * 20;
         int x2 = cx + cos(rad) * 35;
         int y2 = cy + sin(rad) * 35;
-        gfx->drawLine(x1, y1, x2, y2, CLR_SUN_BRIGHT);
-        gfx->drawLine(x1+1, y1, x2+1, y2, CLR_SUN_SHADOW); // Двойной луч для объема
+        gfx->drawLine(x1, y1, x2, y2, CLR_SUN_ORANGE);
+        gfx->drawLine(x1+1, y1+1, x2+1, y2+1, CLR_OUTLINE);
     }
     
-    // 3. Тело солнца
-    gfx->fillCircle(cx, cy, 22, CLR_SUN_SHADOW);
-    gfx->fillCircle(cx, cy, 20, CLR_SUN_BRIGHT);
+    // 2. Тело солнца с контуром
+    gfx->fillCircle(cx, cy, 21, CLR_OUTLINE);
+    gfx->fillCircle(cx, cy, 20, CLR_SUN_MAIN);
     
-    // 4. Глянцевый блик
-    gfx->fillCircle(cx - 8, cy - 8, 7, CLR_SUN_GLOSS);
-    gfx->fillCircle(cx - 8, cy - 8, 5, CLR_SUN_BRIGHT);
+    // 3. Блик
+    gfx->fillCircle(cx - 8, cy - 8, 5, CLR_WHITE);
+    
+    // 4. Личико
+    drawFace(gfx, cx, cy);
 }
 
-// Рисует Объемное ОБЛАКО (Версия 6)
+// Рисует МЕСЯЦ со звездами
+void drawMoonIconPremium(Arduino_GFX *gfx, int x, int y) {
+    int cx = x + 40;
+    int cy = y + 45;
+    
+    // 1. Звездочки вокруг (в стиле картинки)
+    gfx->fillCircle(cx + 15, cy - 20, 3, CLR_MOON_MAIN);
+    gfx->fillCircle(cx + 25, cy - 10, 2, CLR_MOON_MAIN);
+    
+    // 2. Тело луны (полумесяц)
+    gfx->fillCircle(cx, cy, 23, CLR_OUTLINE);
+    gfx->fillCircle(cx, cy, 22, CLR_MOON_MAIN);
+    gfx->fillCircle(cx - 8, cy - 4, 22, BLACK); // Вырезаем форму
+    
+    // 3. Личико на полумесяце
+    gfx->fillCircle(cx + 8, cy - 2, 2, CLR_OUTLINE); // Один глаз (профиль)
+    gfx->drawCircle(cx + 12, cy + 4, 3, CLR_OUTLINE); // Улыбка
+    gfx->fillRect(cx + 8, cy + 2, 8, 4, CLR_MOON_MAIN);
+}
+
+// Рисует Объемное ОБЛАКО (стилизованное)
 void drawCloudIconPremium(Arduino_GFX *gfx, int x, int y) {
-    int ox = x + 10;
-    int oy = y + 10;
+    int ox = x + 15;
+    int oy = y + 20;
     
-    // 1. Нижняя тень (самый темный слой)
-    gfx->fillCircle(ox + 20, oy + 40, 15, CLR_DGRAY);
-    gfx->fillCircle(ox + 40, oy + 45, 18, CLR_DGRAY);
+    // 1. Контур облака (составной из кругов)
+    gfx->fillCircle(ox + 10, oy + 30, 17, CLR_OUTLINE);
+    gfx->fillCircle(ox + 30, oy + 20, 24, CLR_OUTLINE);
+    gfx->fillCircle(ox + 55, oy + 30, 20, CLR_OUTLINE);
     
-    // 2. Основное тело (средний серый)
-    gfx->fillCircle(ox + 15, oy + 35, 15, CLR_LGRAY);
-    gfx->fillCircle(ox + 35, oy + 25, 20, CLR_LGRAY);
-    gfx->fillCircle(ox + 55, oy + 35, 16, CLR_LGRAY);
-    gfx->fillRect(ox + 15, oy + 35, 40, 15, CLR_LGRAY);
+    // 2. Тело облака
+    gfx->fillCircle(ox + 10, oy + 30, 15, CLR_CLOUD_MAIN);
+    gfx->fillCircle(ox + 30, oy + 20, 22, CLR_WHITE);
+    gfx->fillCircle(ox + 55, oy + 30, 18, CLR_CLOUD_DARK);
     
-    // 3. Верхний глянцевый слой (белый)
-    gfx->fillCircle(ox + 35, oy + 22, 16, CLR_WHITE);
-    gfx->fillCircle(ox + 18, oy + 32, 12, CLR_WHITE);
+    // Горизонтальный наполнитель
+    gfx->fillRect(ox + 10, oy + 25, 45, 20, CLR_CLOUD_MAIN);
     
-    // 4. Блик на макушке
-    gfx->fillCircle(ox + 30, oy + 18, 6, CLR_WHITE);
+    // 3. Блик вверху
+    gfx->fillCircle(ox + 30, oy + 15, 12, CLR_WHITE);
 }
 
-// Рисует ДОЖДЬ с каплями (Версия 6)
+// Рисует ДОЖДЬ
 void drawRainIconPremium(Arduino_GFX *gfx, int x, int y) {
     drawCloudIconPremium(gfx, x, y - 5);
     
-    // Капли со светом и тенью
-    int drops[4][2] = {{25,55}, {40,65}, {55,55}, {45,75}};
+    // Капли (крупные и голубые)
+    int drops[4][2] = {{30,65}, {45,75}, {60,65}, {45,85}};
     for(int i=0; i<4; i++) {
         int dx = x + drops[i][0];
         int dy = y + drops[i][1];
-        gfx->fillCircle(dx, dy, 3, CLR_SKY_BLUE);
-        gfx->fillCircle(dx - 1, dy - 1, 1, CLR_WHITE); // Блик на капле
-        gfx->drawLine(dx, dy, dx - 2, dy + 8, CLR_SKY_BLUE);
+        gfx->fillCircle(dx, dy, 4, CLR_OUTLINE);
+        gfx->fillCircle(dx, dy, 3, CLR_CLOUD_DARK);
+        gfx->fillCircle(dx - 1, dy - 1, 1, CLR_WHITE); // Мини-блик
     }
 }
 
-// Рисует СНЕГ (Версия 6)
+// Рисует СНЕГ
 void drawSnowIconPremium(Arduino_GFX *gfx, int x, int y) {
     drawCloudIconPremium(gfx, x, y - 5);
     
-    // Снежинки крестиками с центром
-    int flakes[4][2] = {{25,55}, {40,65}, {58,55}, {35,75}};
+    int flakes[4][2] = {{30,65}, {45,75}, {60,65}, {45,85}};
     for(int i=0; i<4; i++) {
         int sx = x + flakes[i][0];
         int sy = y + flakes[i][1];
-        gfx->drawLine(sx-4, sy, sx+4, sy, CLR_ICE);
-        gfx->drawLine(sx, sy-4, sx, sy+4, CLR_ICE);
-        gfx->drawPixel(sx, sy, CLR_WHITE);
+        gfx->fillCircle(sx, sy, 4, CLR_OUTLINE);
+        gfx->fillCircle(sx, sy, 3, CLR_WHITE);
+        // Рисуем простую снежинку (крестик)
+        gfx->drawLine(sx-2, sy, sx+2, sy, CLR_SNOW_FLAKE);
+        gfx->drawLine(sx, sy-2, sx, sy+2, CLR_SNOW_FLAKE);
     }
 }
 

@@ -3,10 +3,10 @@
 
 // --- Hardware Pin Definitions (ESP32-C3 Super Mini) ---
 
-// Display (ST7789)
+// Display (ILI9341 - 2.4" TFT SPI)
 #define PIN_LCD_SCK 6
 #define PIN_LCD_MOSI 7
-#define PIN_LCD_CS -1
+#define PIN_LCD_CS 4
 #define PIN_LCD_DC 5
 #define PIN_LCD_RST 8
 #define PIN_LCD_BL 10  // PWM for backlight brightness
@@ -15,8 +15,8 @@
 // Note: ESP32-C3 has limited UARTs. TX/RX might need remapping if HardwareSerial is used.
 // We will use HardwareSerial1 or SoftwareSerial if needed.
 // ESP32-C3 Defualt Serial0 is USB.
-#define PIN_AUDIO_RX 20 // Connect to DFPlayer TX
-#define PIN_AUDIO_TX 21 // Connect to DFPlayer RX (via 1k Resistor)
+#define PIN_AUDIO_RX 21 // Connect to DFPlayer TX
+#define PIN_AUDIO_TX 20 // Connect to DFPlayer RX (via 1k Resistor)
 
 // LEDs
 #define PIN_WS2812 2      // Addressable LED Strip (DIN)
@@ -44,6 +44,6 @@
 
 // --- Display Settings ---
 #define SCREEN_WIDTH 240
-#define SCREEN_HEIGHT 240
+#define SCREEN_HEIGHT 320
 
 #endif // CONFIG_H

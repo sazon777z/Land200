@@ -31,6 +31,17 @@ public:
     // Settings getters (for UI sync)
     int getTimeZoneOffset();
     String getWeatherCity();
+    
+    // Alarm settings
+    void saveAlarm(int hour, int minute, int soundId, bool enabled);
+    void saveAlarmVolume(int volume);
+    int getAlarmHour() { return alarmHour; }
+    int getAlarmMinute() { return alarmMinute; }
+    int getAlarmSoundId() { return alarmSoundId; }
+    int getAlarmVolume() { return alarmVolume; }
+    bool isAlarmEnabled() { return alarmEnabled; }
+    bool checkAlarmTrigger();
+    void resetAlarmTrigger(); // Manual stop
 
     // Settings setters
     void saveWiFiCredentials(String ssid, String pass);
@@ -49,6 +60,15 @@ private:
     // Localization
     int timeOffset;
     String weatherCity;
+    
+    // Alarm state
+    int alarmHour;
+    int alarmMinute;
+    int alarmSoundId;
+    int alarmVolume;
+    bool alarmEnabled;
+    bool alarmTriggeredToday;
+    int lastTriggerMinute; // To prevent multiple triggers in one minute
     
     bool apMode;
     

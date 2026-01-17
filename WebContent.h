@@ -51,10 +51,13 @@ const char index_html[] PROGMEM = R"rawliteral(
                 <div class="control-group">
                     <label for="alarmSound">Звук</label>
                     <select id="alarmSound">
-                        <option value="1">Запуск V8</option>
-                        <option value="2">Двигатель V6</option>
-                        <option value="3">Сигнал</option>
-                        <option value="4">Бип тревоги</option>
+                        <option value="1">Звук 1</option>
+                        <option value="2">Звук 2</option>
+                        <option value="3">Звук 3</option>
+                        <option value="4">Звук 4</option>
+                        <option value="5">Звук 5</option>
+                        <option value="6">Звук 6</option>
+                        <option value="7">Звук 7</option>
                     </select>
                 </div>
                 <div class="control-group">
@@ -69,17 +72,23 @@ const char index_html[] PROGMEM = R"rawliteral(
             </section>
 
             <!-- System Settings -->
-            <section class="glass-card">
+            <section class="glass-card" id="wifiSection">
                 <h2>Настройка WiFi</h2>
-                <div class="control-group">
-                    <label>SSID (Имя сети)</label>
-                    <input type="text" id="wifiSsid" placeholder="Название вашей сети">
+                <div id="wifiConnectForm">
+                    <div class="control-group">
+                        <label>SSID (Имя сети)</label>
+                        <input type="text" id="wifiSsid" placeholder="Название вашей сети">
+                    </div>
+                    <div class="control-group">
+                        <label>Пароль</label>
+                        <input type="password" id="wifiPass" placeholder="Ваш пароль">
+                    </div>
+                    <button class="btn btn-primary" id="saveWifiBtn">Сохранить и перезагрузить</button>
                 </div>
-                <div class="control-group">
-                    <label>Пароль</label>
-                    <input type="password" id="wifiPass" placeholder="Ваш пароль">
+                <div id="wifiConnectedInfo" style="display:none;">
+                    <p style="margin-bottom:15px; opacity:0.8;">Устройство подключено к сети.</p>
+                    <button class="btn btn-secondary" id="resetWifiBtn">Настроить Wi-Fi заново</button>
                 </div>
-                <button class="btn btn-primary" id="saveWifiBtn">Сохранить и перезагрузить</button>
             </section>
 
             <!-- Localization Settings -->
@@ -106,6 +115,7 @@ const char index_html[] PROGMEM = R"rawliteral(
                         <option value="Kyzylorda">Кызылорда</option>
                         <option value="Atyrau">Атырау</option>
                         <option value="Petropavl">Петропавловск</option>
+                        <option value="Rudny">Рудный</option>
                     </select>
                 </div>
                 <button class="btn btn-primary" id="saveLocBtn">Сохранить настройки</button>
@@ -286,6 +296,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(fetchStatus, 5000);
     document.getElementById('saveAlarmBtn').addEventListener('click', saveAlarm);
     document.getElementById('saveWifiBtn').addEventListener('click', saveWifi);
+    document.getElementById('resetWifiBtn').addEventListener('click', resetWifi);
     document.getElementById('saveLocBtn').addEventListener('click', saveLoc);
     document.getElementById('testSoundBtn').addEventListener('click', testSound);
     document.getElementById('stopSoundBtn').addEventListener('click', stopSound);
@@ -389,6 +400,17 @@ async function fetchStatus() {
              document.getElementById('alarmVolumeRange').value = data.alarm_volume;
         }
 
+        // WiFi Status UI
+        const wifiForm = document.getElementById('wifiConnectForm');
+        const wifiInfo = document.getElementById('wifiConnectedInfo');
+        if (data.is_ap) {
+            wifiForm.style.display = 'block';
+            wifiInfo.style.display = 'none';
+        } else {
+            wifiForm.style.display = 'none';
+            wifiInfo.style.display = 'block';
+        }
+
     } catch (error) {
         document.getElementById('connectionStatus').className = 'status-indicator';
     }
@@ -426,6 +448,15 @@ async function saveLoc() {
         alert('Локализация сохранена!');
         fetchStatus(); // Refresh
     } catch (e) { alert('Ошибка при сохранении настроек'); }
+}
+async function resetWifi() {
+    if (confirm('Очистить настройки WiFi и перейти в режим точки доступа?')) {
+        try {
+            await fetch('/api/settings/wifi_reset');
+            alert('Настройки сброшены. Устройство перезагружается...');
+            setTimeout(() => { location.reload(); }, 5000);
+        } catch (e) { alert('Ошибка при сбросе WiFi'); }
+    }
 }
 async function testSound() {
     const sound = document.getElementById('alarmSound').value;

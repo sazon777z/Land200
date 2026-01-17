@@ -3,7 +3,6 @@
 #include <Arduino.h>
 #include <Arduino_GFX_Library.h>
 
-
 // Шрифты Adafruit GFX для красивого отображения (используем локальные копии)
 #include "FreeSansBold18pt7b.h" // Для масштабирования x2 (~72px)
 #include "FreeSansBold24pt7b.h"
@@ -15,6 +14,7 @@ static int prevMinute = -1;
 static int prevSecond = -1;
 static float prevTemp = -999;
 static String prevCondition = "";
+static String prevIconStr = "";
 static bool colonVisible = true;
 
 DisplayDriver::DisplayDriver() {
@@ -97,74 +97,93 @@ void DisplayDriver::drawClock(int hour, int minute, int second) {
 }
 
 void DisplayDriver::drawWeather(float temp, String condition, String icon) {
-  // Detect night mode from OpenWeatherMap icon code (suffixes like '01n',
-  // '02n', etc.)
   bool isNight = icon.endsWith("n");
 
-  if (abs(temp - prevTemp) < 0.1 && condition == prevCondition)
+  // Check what changed
+  bool tempChanged = (abs(temp - prevTemp) >= 0.1);
+  bool conditionChanged = (condition != prevCondition || icon != prevIconStr);
+
+  if (!tempChanged && !conditionChanged)
     return;
-  prevTemp = temp;
-  prevCondition = condition;
 
-  // Очищаем НИЖНЮЮ зону
-  gfx->fillRect(0, 175, SCREEN_WIDTH, 145, BLACK);
+  // Draw Separator only if it might have been cleared or first run
+  // (simplification: just draw it if anything changed, it's fast) Or better:
+  // Draw it once? For now, we assume background is black. Let's protect the
+  // separator line area (y=180). We draw below it.
+  if (prevTemp == -999) { // First run
+    gfx->drawLine(20, 180, SCREEN_WIDTH - 20, 180, CLR_DGRAY);
+  }
 
-  // Декоративная линия-разделитель (тонкая, глянцевая)
-  gfx->drawLine(20, 180, SCREEN_WIDTH - 20, 180, CLR_DGRAY);
+  // 1. UPDATE ICON
+  if (conditionChanged || prevTemp == -999) {
+    prevCondition = condition;
+    prevIconStr = icon;
 
-  // 1. ПРЕМИУМ ИКОНКА (Центрируем по вертикали в нижней части)
-  int iconX = 10;
-  int iconY = 195;
+    // Clear Icon Area (Left side)
+    // x=0 to 120, y=185 to 320
+    gfx->fillRect(0, 185, 120, 135, BLACK);
 
-  if (condition == "Clear") {
-    if (isNight)
-      drawMoonVolumetric(gfx, iconX, iconY);
+    int iconX = 10;
+    int iconY = 195;
+
+    if (condition == "Clear") {
+      if (isNight)
+        drawMoonVolumetric(gfx, iconX, iconY);
+      else
+        drawSunVolumetric(gfx, iconX, iconY);
+    } else if (condition == "Clouds")
+      drawCloudVolumetric(gfx, iconX, iconY);
+    else if (condition == "Rain" || condition == "Drizzle")
+      drawRainVolumetric(gfx, iconX, iconY);
+    else if (condition == "Thunderstorm")
+      drawThunderVolumetric(gfx, iconX, iconY);
+    else if (condition == "Mist" || condition == "Fog" || condition == "Haze")
+      drawFogVolumetric(gfx, iconX, iconY);
+    else if (condition == "Snow")
+      drawSnowVolumetric(gfx, iconX, iconY);
     else
-      drawSunVolumetric(gfx, iconX, iconY);
-  } else if (condition == "Clouds")
-    drawCloudVolumetric(gfx, iconX, iconY);
-  else if (condition == "Rain" || condition == "Drizzle")
-    drawRainVolumetric(gfx, iconX, iconY);
-  else if (condition == "Thunderstorm")
-    drawThunderVolumetric(gfx, iconX, iconY);
-  else if (condition == "Mist" || condition == "Fog" || condition == "Haze")
-    drawFogVolumetric(gfx, iconX, iconY);
-  else if (condition == "Snow")
-    drawSnowVolumetric(gfx, iconX, iconY);
-  else
-    drawCloudVolumetric(gfx, iconX, iconY);
+      drawCloudVolumetric(gfx, iconX, iconY);
+  }
 
-  // 2. ТЕМПЕРАТУРА (Современный стиль с подложкой)
-  gfx->setFont(&FreeSansBold24pt7b);
-  gfx->setTextSize(1);
+  // 2. UPDATE TEMP
+  if (tempChanged || prevTemp == -999) {
+    prevTemp = temp;
 
-  char tempStr[10];
-  sprintf(tempStr, "%.1f", temp);
+    // Clear Temp Area (Right side)
+    // x=120 to 240, y=185 to 320
+    gfx->fillRect(120, 185, 120, 135, BLACK);
 
-  int16_t tx1, ty1;
-  uint16_t tw, th;
-  gfx->getTextBounds(tempStr, 0, 0, &tx1, &ty1, &tw, &th);
+    gfx->setFont(&FreeSansBold24pt7b);
+    gfx->setTextSize(1);
 
-  int txPos = SCREEN_WIDTH - tw - 45; // Оставляем место для символа градуса
-  int tyPos = 265;
+    char tempStr[10];
+    sprintf(tempStr, "%.1f", temp);
 
-  // Тень для температуры
-  gfx->setTextColor(CLR_DEEP_BLUE);
-  gfx->setCursor(txPos + 2, tyPos + 2);
-  gfx->print(tempStr);
+    int16_t tx1, ty1;
+    uint16_t tw, th;
+    gfx->getTextBounds(tempStr, 0, 0, &tx1, &ty1, &tw, &th);
 
-  // Основной цвет температуры
-  gfx->setTextColor(CYAN);
-  gfx->setCursor(txPos, tyPos);
-  gfx->print(tempStr);
+    int txPos = SCREEN_WIDTH - tw - 45; // Leave space for degree symbol
+    int tyPos = 265;
 
-  // Символ градуса (ПРЕМИУМ: Закрашенный круг с обводкой)
-  int degX = txPos + tw + 8;
-  int degY = tyPos - th + 5;
-  gfx->fillCircle(degX, degY, 4, CYAN);
-  gfx->drawCircle(degX, degY, 5, WHITE);
+    // Shadow
+    gfx->setTextColor(CLR_DEEP_BLUE);
+    gfx->setCursor(txPos + 2, tyPos + 2);
+    gfx->print(tempStr);
 
-  gfx->setFont(NULL);
+    // Main Text
+    gfx->setTextColor(CYAN);
+    gfx->setCursor(txPos, tyPos);
+    gfx->print(tempStr);
+
+    // Degree Symbol
+    int degX = txPos + tw + 8;
+    int degY = tyPos - th + 5;
+    gfx->fillCircle(degX, degY, 4, CYAN);
+    gfx->drawCircle(degX, degY, 5, WHITE);
+
+    gfx->setFont(NULL);
+  }
 }
 
 void DisplayDriver::drawConnecting(String ssid) {

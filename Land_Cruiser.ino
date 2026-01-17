@@ -6,7 +6,6 @@
 #include "config.h"
 #include <Arduino.h>
 
-
 // Global Driver Instances
 DisplayDriver display;
 AudioDriver audio;
@@ -17,18 +16,26 @@ WebManager web(&network, &audio, &led, &display);
 // FreeRTOS Task Handles
 TaskHandle_t TaskDisplayHandle;
 TaskHandle_t TaskNetworkHandle;
+TaskHandle_t TaskWebHandle;
 
-// Button Check
+// Button Check (Non-blocking)
 void checkButton() {
-  if (digitalRead(PIN_BUTTON) == LOW) { // Active Low
-    delay(30);                          // Quick debounce
-    if (digitalRead(PIN_BUTTON) == LOW) {
+  static bool btnPressed = false;
+  static unsigned long lastDebounceTime = 0;
+
+  bool currentReading = (digitalRead(PIN_BUTTON) == LOW); // Active Low
+
+  if (currentReading && !btnPressed) {
+    if (millis() - lastDebounceTime > 50) { // Debounce
+      btnPressed = true;
       Serial.println("Button Pressed: Stopping Sound");
       audio.stop();
       led.setModeIdle();
-      while (digitalRead(PIN_BUTTON) == LOW)
-        delay(10); // Wait for release
+      lastDebounceTime = millis();
     }
+  } else if (!currentReading && btnPressed) {
+    btnPressed = false;
+    lastDebounceTime = millis();
   }
 }
 
@@ -73,6 +80,17 @@ void TaskNetwork(void *pvParameters) {
   }
 }
 
+void TaskWeb(void *pvParameters) {
+  (void)pvParameters;
+  for (;;) {
+    // Calling handleClient repeatedly.
+    // This handles incoming HTTP requests.
+    web.handle();
+    // Small delay to yield to other tasks, but keep responsive
+    vTaskDelay(5 / portTICK_PERIOD_MS);
+  }
+}
+
 void setup() {
   // Basic Serial for Debug
   Serial.begin(115200);
@@ -101,12 +119,15 @@ void setup() {
   // so just prioritizing.
   xTaskCreate(TaskDisplay, "DisplayTask", 4096, NULL, 1, &TaskDisplayHandle);
   xTaskCreate(TaskNetwork, "NetworkTask", 8192, NULL, 1, &TaskNetworkHandle);
+  // Web task needs reasonable stack for file operations
+  xTaskCreate(TaskWeb, "WebTask", 6144, NULL, 1, &TaskWebHandle);
 }
 
 void loop() {
   // Quick tasks in main loop (LED animations need high FPS)
+  // Now loop is not blocked by Web or Button delays
   led.update();
   checkButton();
-  web.handle(); // Handle web server requests
-  delay(10);
+  delay(5); // Small delay to prevent watchdog starvation if led.update is very
+            // fast
 }

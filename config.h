@@ -22,9 +22,6 @@
 #define PIN_WS2812 2 // Addressable LED Strip (DIN)
 #define NUM_LEDS 8   // Number of WS2812B LEDs (4 underglow + 4 vehicle)
 
-#define PIN_FRONT_LEDS 0 // Front Headlights (PWM/Digital)
-#define PIN_REAR_LEDS 1  // Rear Taillights (PWM/Digital)
-
 // Button
 #define PIN_BUTTON 3 // Input Pullup
 

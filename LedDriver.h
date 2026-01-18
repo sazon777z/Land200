@@ -4,7 +4,6 @@
 #include "config.h"
 #include <Adafruit_NeoPixel.h>
 
-
 class LedDriver {
 public:
   LedDriver();
@@ -43,10 +42,6 @@ public:
   void setModeIdle();
   void setModeAlarm(AlarmCarEffect carEff = ACE_BLINK,
                     LedEffect ledEff = RAINBOW);
-
-  // Physical pin controls (legacy)
-  void setHeadlights(bool on);
-  void setTaillights(bool on);
 
 private:
   Adafruit_NeoPixel strip;

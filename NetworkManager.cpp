@@ -12,8 +12,9 @@ WatchNetworkManager::WatchNetworkManager()
                                DAYLIGHT_OFFSET_SEC)),
       lastWeatherUpdate(0), currentTemp(0.0), currentCondition("--"),
       currentIcon(""), timeOffset(5), weatherCity("Almaty"), alarmHour(0),
-      alarmMinute(0), alarmSoundId(1), alarmVolume(20), alarmEnabled(false),
-      alarmTriggeredToday(false), lastTriggerMinute(-1), apMode(false) {}
+      alarmMinute(0), alarmSoundId(1), alarmVolume(20), alarmCarEffect(1),
+      alarmLedEffect(1), alarmEnabled(false), alarmTriggeredToday(false),
+      lastTriggerMinute(-1), apMode(false) {}
 
 void WatchNetworkManager::begin() {
   if (systemMutex == NULL) {
@@ -35,16 +36,23 @@ void WatchNetworkManager::begin() {
   alarmMinute = preferences.getInt("alarmMinute", 0);
   alarmSoundId = preferences.getInt("alarmSound", 1);
   alarmVolume = preferences.getInt("alarmVol", 20);
+  alarmCarEffect = preferences.getInt("alarmCarEff", 1); // Default ACE_BLINK
+  alarmLedEffect = preferences.getInt("alarmLedEff", 1); // Default RAINBOW
   alarmEnabled = preferences.getBool("alarmEnabled", false);
 
   preferences.end();
   xSemaphoreGive(systemMutex);
 
   if (ssid == "") {
-    Serial.println("No saved WiFi. Starting AP.");
-    preferences.end(); // Close before return
-    setupAP();
-    return;
+    if (String(WIFI_SSID) != "" && String(WIFI_SSID) != "YOUR_WIFI_SSID") {
+      Serial.println("No saved WiFi. Using defaults from config.h.");
+      ssid = WIFI_SSID;
+      pass = WIFI_PASS;
+    } else {
+      Serial.println("No saved WiFi and no defaults. Starting AP.");
+      setupAP();
+      return;
+    }
   }
 
   WiFi.persistent(true);
@@ -80,7 +88,6 @@ void WatchNetworkManager::begin() {
     Serial.println("\nConnection failed. Starting AP fallback.");
     setupAP();
   }
-  preferences.end();
 }
 
 void WatchNetworkManager::setupAP() {
@@ -207,10 +214,12 @@ void WatchNetworkManager::saveLocalizationSettings(int timezoneOffset,
 }
 
 void WatchNetworkManager::saveAlarm(int hour, int minute, int soundId,
-                                    bool enabled) {
+                                    int carEff, int ledEff, bool enabled) {
   alarmHour = hour;
   alarmMinute = minute;
   alarmSoundId = soundId;
+  alarmCarEffect = carEff;
+  alarmLedEffect = ledEff;
   alarmEnabled = enabled;
 
   xSemaphoreTake(systemMutex, portMAX_DELAY);
@@ -218,12 +227,15 @@ void WatchNetworkManager::saveAlarm(int hour, int minute, int soundId,
   preferences.putInt("alarmHour", hour);
   preferences.putInt("alarmMinute", minute);
   preferences.putInt("alarmSound", soundId);
+  preferences.putInt("alarmCarEff", carEff);
+  preferences.putInt("alarmLedEff", ledEff);
   preferences.putBool("alarmEnabled", enabled);
   preferences.end();
   xSemaphoreGive(systemMutex);
 
-  Serial.printf("Alarm saved: %02d:%02d, Sound: %d, Enabled: %d\n", hour,
-                minute, soundId, enabled);
+  Serial.printf("Alarm saved: %02d:%02d, Sound: %d, CarEff: %d, LedEff: %d, "
+                "Enabled: %d\n",
+                hour, minute, soundId, carEff, ledEff, enabled);
 }
 
 void WatchNetworkManager::saveAlarmVolume(int volume) {

@@ -36,12 +36,15 @@ public:
   String getWeatherCity();
 
   // Alarm settings
-  void saveAlarm(int hour, int minute, int soundId, bool enabled);
+  void saveAlarm(int hour, int minute, int soundId, int carEff, int ledEff,
+                 bool enabled);
   void saveAlarmVolume(int volume);
   int getAlarmHour() { return alarmHour; }
   int getAlarmMinute() { return alarmMinute; }
   int getAlarmSoundId() { return alarmSoundId; }
   int getAlarmVolume() { return alarmVolume; }
+  int getAlarmCarEffect() { return alarmCarEffect; }
+  int getAlarmLedEffect() { return alarmLedEffect; }
   bool isAlarmEnabled() { return alarmEnabled; }
   bool checkAlarmTrigger();
   void resetAlarmTrigger(); // Manual stop
@@ -69,6 +72,8 @@ private:
   int alarmMinute;
   int alarmSoundId;
   int alarmVolume;
+  int alarmCarEffect;
+  int alarmLedEffect;
   bool alarmEnabled;
   bool alarmTriggeredToday;
   int lastTriggerMinute; // To prevent multiple triggers in one minute

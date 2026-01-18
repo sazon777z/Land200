@@ -49,6 +49,8 @@ void WebManager::setupRoutes() {
     doc["alarm_time"] = String(alarmTime);
     doc["alarm_sound"] = net->getAlarmSoundId();
     doc["alarm_volume"] = net->getAlarmVolume();
+    doc["alarm_car_eff"] = net->getAlarmCarEffect();
+    doc["alarm_led_eff"] = net->getAlarmLedEffect();
     doc["alarm_enabled"] = net->isAlarmEnabled();
     doc["is_ap"] = net->isAPMode();
 
@@ -83,7 +85,10 @@ void WebManager::setupRoutes() {
 
       String time = doc["time"]; // Format "HH:MM"
       int sound = doc["sound"];
-      bool enabled = doc["enabled"] | true; // Default to true if not sent
+      int carEff = doc["carEff"].as<int>();
+      int ledEff = doc["ledEff"].as<int>();
+      int volume = doc["volume"] | net->getAlarmVolume();
+      bool enabled = doc["enabled"] | true;
 
       int h = 0, m = 0;
       if (time.length() == 5) {
@@ -91,7 +96,9 @@ void WebManager::setupRoutes() {
         m = time.substring(3, 5).toInt();
       }
 
-      net->saveAlarm(h, m, sound, enabled);
+      net->saveAlarm(h, m, sound, carEff, ledEff, enabled);
+      net->saveAlarmVolume(volume);
+      audio->setVolume(volume);
       server.send(200, "application/json", "{\"status\":\"success\"}");
     } else {
       server.send(400, "text/plain", "Bad Request");

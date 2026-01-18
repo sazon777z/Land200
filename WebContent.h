@@ -22,173 +22,183 @@ const char index_html[] PROGMEM = R"rawliteral(
         </header>
 
         <main>
-            <!-- Dashboard Card -->
-            <section class="glass-card">
-                <h2>Панель состояния</h2>
-                <div class="info-grid">
-                    <div class="info-item">
-                        <span class="label">Время</span>
-                        <span class="value" id="timeValue">--:--</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="label">Темп.</span>
-                        <span class="value" id="tempValue">--&deg;C</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="label">Погода</span>
-                        <span class="value" id="weatherValue">--</span>
-                    </div>
-                </div>
-            </section>
+            <nav class="tabs-nav">
+                <button class="tab-btn active" onclick="switchTab('main')">Главное</button>
+                <button class="tab-btn" onclick="switchTab('settings')">Настройки</button>
+                <button class="tab-btn" onclick="switchTab('effects')">Подсветка</button>
+            </nav>
 
-            <!-- Alarm Settings -->
-            <section class="glass-card">
-                <h2>Будильник</h2>
-                <div class="control-group">
-                    <label for="alarmTime">Установить время</label>
-                    <input type="time" id="alarmTime">
-                </div>
-                <div class="control-group">
-                    <label for="alarmSound">Звук</label>
-                    <select id="alarmSound">
-                        <option value="1">Звук 1</option>
-                        <option value="2">Звук 2</option>
-                        <option value="3">Звук 3</option>
-                        <option value="4">Звук 4</option>
-                        <option value="5">Звук 5</option>
-                        <option value="6">Звук 6</option>
-                        <option value="7">Звук 7</option>
-                    </select>
-                </div>
-                <div class="control-group">
-                    <label for="alarmVolumeRange">Громкость будильника</label>
-                    <input type="range" id="alarmVolumeRange" min="0" max="30" value="20">
-                </div>
-                <div class="button-group">
-                    <button class="btn btn-primary" id="saveAlarmBtn">Сохранить время</button>
-                    <button class="btn btn-secondary" id="testSoundBtn">Тест</button>
-                    <button class="btn btn-danger" id="stopSoundBtn">Стоп</button>
-                </div>
-            </section>
+            <div id="tab-main" class="tab-content active">
+                <!-- Dashboard Card -->
+                <section class="glass-card">
+                    <h2>Панель состояния</h2>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="label">Время</span>
+                            <span class="value" id="timeValue">--:--</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Темп.</span>
+                            <span class="value" id="tempValue">--&deg;C</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Погода</span>
+                            <span class="value" id="weatherValue">--</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">Город</span>
+                            <span class="value" id="cityValue">--</span>
+                        </div>
+                    </div>
+                </section>
 
-            <!-- System Settings -->
-            <section class="glass-card" id="wifiSection">
-                <h2>Настройка WiFi</h2>
-                <div id="wifiConnectForm">
+                <!-- Alarm Settings -->
+                <section class="glass-card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid var(--glass-border); padding-bottom:5px;">
+                        <h2 style="margin:0; border:none; padding:0;">Будильник</h2>
+                        <span id="savedAlarmBadge" class="label" style="background:rgba(255,255,255,0.1); padding:4px 8px; border-radius:12px; font-weight:700;">Выкл</span>
+                    </div>
+                    
                     <div class="control-group">
-                        <label>SSID (Имя сети)</label>
-                        <input type="text" id="wifiSsid" placeholder="Название вашей сети">
+                        <label for="alarmTime">Установка времени</label>
+                        <input type="time" id="alarmTime" data-dirty="false">
                     </div>
+                    
+                    <div class="info-grid" style="margin-bottom:15px;">
+                        <div class="control-group" style="margin:0;">
+                            <label>Звук</label>
+                            <select id="alarmSound" data-dirty="false">
+                                <option value="1">Звук 1</option>
+                                <option value="2">Звук 2</option>
+                                <option value="3">Звук 3</option>
+                                <option value="4">Звук 4</option>
+                                <option value="5">Звук 5</option>
+                                <option value="6">Звук 6</option>
+                                <option value="7">Звук 7</option>
+                            </select>
+                        </div>
+                        <div class="control-group" style="margin:0;">
+                            <label>Громкость</label>
+                            <input type="range" id="alarmVolumeRange" min="0" max="30" value="20" style="padding:5px;" data-dirty="false">
+                        </div>
+                    </div>
+
                     <div class="control-group">
-                        <label>Пароль</label>
-                        <input type="password" id="wifiPass" placeholder="Ваш пароль">
+                        <label>Эффект фар при срабатывании</label>
+                        <select id="alarmCarEff" data-dirty="false">
+                            <option value="0">Выкл</option>
+                            <option value="1">Моргание фар</option>
+                            <option value="2">Аварийка</option>
+                            <option value="3">Полиция</option>
+                        </select>
                     </div>
-                    <button class="btn btn-primary" id="saveWifiBtn">Сохранить и перезагрузить</button>
-                </div>
-                <div id="wifiConnectedInfo" style="display:none;">
-                    <p style="margin-bottom:15px; opacity:0.8;">Устройство подключено к сети.</p>
-                    <button class="btn btn-secondary" id="resetWifiBtn">Настроить Wi-Fi заново</button>
-                </div>
-            </section>
 
-            <!-- Localization Settings -->
-            <section class="glass-card">
-                <h2>Локализация</h2>
-                <div class="control-group">
-                    <label>Часовой пояс (UTC)</label>
-                    <input type="number" id="timeZone" placeholder="напр. 5 для GMT+5" value="5">
-                </div>
-                <div class="control-group">
-                    <label>Город для погоды</label>
-                    <select id="weatherCity">
-                        <option value="Almaty">Алматы</option>
-                        <option value="Astana">Астана</option>
-                        <option value="Shymkent">Шымкент</option>
-                        <option value="Aktobe">Актобе</option>
-                        <option value="Karaganda">Караганда</option>
-                        <option value="Taraz">Тараз</option>
-                        <option value="Pavlodar">Павлодар</option>
-                        <option value="Ust-Kamenogorsk">Усть-Каменогорск</option>
-                        <option value="Semey">Семей</option>
-                        <option value="Aktau">Актау</option>
-                        <option value="Kostanay">Костанай</option>
-                        <option value="Kyzylorda">Кызылорда</option>
-                        <option value="Atyrau">Атырау</option>
-                        <option value="Petropavl">Петропавловск</option>
-                        <option value="Rudny">Рудный</option>
-                    </select>
-                </div>
-                <button class="btn btn-primary" id="saveLocBtn">Сохранить настройки</button>
-            </section>
+                    <div class="control-group">
+                        <label>Эффект подсветки при срабатывании</label>
+                        <select id="alarmLedEff" data-dirty="false">
+                            <option value="0">Выкл (Оранжевый)</option>
+                            <option value="1">Радуга</option>
+                            <option value="4">Полиция</option>
+                            <option value="5">Стробоскоп</option>
+                            <option value="2">Статичный цвет</option>
+                        </select>
+                    </div>
 
-            <!-- Underglow Lights -->
-            <section class="glass-card">
-                <h2>Подсветка днища</h2>
-                <div class="control-group">
-                    <label>Эффект</label>
-                    <select id="ledEffect">
-                        <option value="0">Выкл</option>
-                        <option value="1" selected>Радуга</option>
-                        <option value="2">Статичный цвет</option>
-                        <option value="3">Дыхание</option>
-                        <option value="4">Полиция</option>
-                        <option value="5">Стробоскоп</option>
-                        <option value="6">Затухание</option>
-                        <option value="7">Искры</option>
-                        <option value="8">Бегущий огонь</option>
-                    </select>
-                </div>
-                <div class="control-group">
-                    <label>Основной цвет</label>
-                    <input type="color" id="ledColor" value="#00d2ff">
-                </div>
-                <div class="control-group">
-                    <label>Яркость LED</label>
-                    <input type="range" id="ledBrightRange" min="0" max="255" value="150">
-                </div>
-                <div class="control-group">
-                    <label>Скорость эффектов</label>
-                    <input type="range" id="ledSpeedRange" min="1" max="100" value="50">
-                </div>
-            </section>
-
-            <!-- Vehicle Configuration -->
-            <section class="glass-card">
-                <h2>Конфигурация авто</h2>
-                
-                <div class="car-schematic">
-                    <div id="visual-f-l" class="light-node f-left">Ф</div>
-                    <div id="visual-f-r" class="light-node f-right">Ф</div>
-                    <div id="visual-r-l" class="light-node r-left">З</div>
-                    <div id="visual-r-r" class="light-node r-right">З</div>
-                </div>
-
-                <div class="control-group">
-                    <label>Управление светом</label>
                     <div class="button-group">
-                        <button class="btn btn-secondary" id="frontLightsBtn">Фары выкл</button>
-                        <button class="btn btn-secondary" id="rearLightsBtn">Задние выкл</button>
+                        <button class="btn btn-primary" id="saveAlarmBtn">Сохранить</button>
+                        <button class="btn btn-secondary" id="testSoundBtn">Тест</button>
+                        <button class="btn btn-danger" id="stopSoundBtn" style="flex:0.5;">Стоп</button>
                     </div>
-                </div>
-                <div class="control-group">
-                    <label>Поворотники</label>
-                    <select id="turnSignal">
-                        <option value="0">Выкл</option>
-                        <option value="1">Влево</option>
-                        <option value="2">Вправо</option>
-                        <option value="3">Аварийка</option>
-                    </select>
-                </div>
-            </section>
+                </section>
 
-            <section class="glass-card">
-                <h2>Дисплей</h2>
-                <div class="control-group">
-                    <label>Яркость экрана</label>
-                    <input type="range" id="dispBrightRange" min="0" max="255" value="255">
-                </div>
-                <button class="btn btn-danger" id="rebootBtn">Перезагрузить систему</button>
-            </section>
+            </div>
+
+            <div id="tab-settings" class="tab-content">
+                <!-- Localization Settings -->
+                <section class="glass-card">
+                    <h2>Локализация</h2>
+                    <div class="control-group">
+                        <label>Часовой пояс (UTC)</label>
+                        <input type="number" id="timeZone" placeholder="напр. 5 для GMT+5" value="5">
+                    </div>
+                    <div class="control-group">
+                        <label>Город для погоды</label>
+                        <select id="weatherCity">
+                            <option value="Almaty">Алматы</option>
+                            <option value="Astana">Астана</option>
+                            <option value="Shymkent">Шымкент</option>
+                            <option value="Aktobe">Актобе</option>
+                            <option value="Karaganda">Караганда</option>
+                            <option value="Taraz">Тараз</option>
+                            <option value="Pavlodar">Павлодар</option>
+                            <option value="Ust-Kamenogorsk">Усть-Каменогорск</option>
+                            <option value="Semey">Семей</option>
+                            <option value="Aktau">Актау</option>
+                            <option value="Kostanay">Костанай</option>
+                            <option value="Kyzylorda">Кызылорда</option>
+                            <option value="Atyrau">Атырау</option>
+                            <option value="Petropavl">Петропавловск</option>
+                            <option value="Rudny">Рудный</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" id="saveLocBtn">Сохранить локализацию</button>
+                </section>
+
+                <!-- Wi-Fi Settings -->
+                <section class="glass-card" id="wifiSection">
+                    <h2>Wi-Fi</h2>
+                    <div id="wifiConnectForm">
+                        <div class="control-group">
+                            <label>SSID</label>
+                            <input type="text" id="wifiSsid" placeholder="Имя сети">
+                        </div>
+                        <div class="control-group">
+                            <label>Пароль</label>
+                            <input type="password" id="wifiPass" placeholder="Пароль">
+                        </div>
+                        <button class="btn btn-primary" id="saveWifiBtn">Сохранить и перезагрузить</button>
+                    </div>
+                    <div id="wifiConnectedInfo" style="display:none;">
+                        <p style="margin-bottom:15px; opacity:0.8;">Устройство подключено.</p>
+                        <button class="btn btn-secondary" id="resetWifiBtn">Сбросить Wi-Fi</button>
+                    </div>
+                </section>
+
+                <section class="glass-card">
+                    <h2>Система</h2>
+                    <div class="control-group">
+                        <label>Яркость экрана</label>
+                        <input type="range" id="dispBrightRange" min="0" max="255" value="255">
+                    </div>
+                    <button class="btn btn-danger" id="rebootBtn">Перезагрузить систему</button>
+                </section>
+            </div>
+
+            <div id="tab-effects" class="tab-content">
+                <!-- Underglow Lights -->
+                </section>
+
+                <!-- Vehicle Configuration (Moved) -->
+                <section class="glass-card">
+                    <h2>Конфигурация фар</h2>
+                    <div class="control-group">
+                        <label>Управление светом</label>
+                        <div class="button-group">
+                            <button class="btn btn-secondary" id="frontLightsBtn">Фары выкл</button>
+                            <button class="btn btn-secondary" id="rearLightsBtn">Задние выкл</button>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label>Поворотники</label>
+                        <select id="turnSignal">
+                            <option value="0">Выкл</option>
+                            <option value="1">Влево</option>
+                            <option value="2">Вправо</option>
+                            <option value="3">Аварийка</option>
+                        </select>
+                    </div>
+                </section>
+            </div>
         </main>
     </div>
     <script src="script.js"></script>
@@ -249,49 +259,65 @@ input[type="time"], select, input[type="range"], input[type="text"], input[type=
 .btn-secondary { background: transparent; border: 1px solid var(--primary-color); color: var(--primary-color); }
 .btn-danger { background: rgba(255, 59, 59, 0.2); color: #ff3b3b; border: 1px solid #ff3b3b; width: 100%; }
 
-/* Car Schematic */
-.car-schematic {
-    position: relative;
-    width: 160px;
-    height: 280px;
-    background: rgba(255,255,255,0.05);
-    border: 2px solid rgba(255,255,255,0.2);
-    border-radius: 40px 40px 20px 20px;
-    margin: 20px auto;
-}
-.light-node {
-    position: absolute;
-    width: 30px;
-    height: 15px;
-    background: rgba(255,255,255,0.1);
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.3s;
+/* Tab Navigation Styles */
+.tabs-nav {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 10px;
-    font-weight: bold;
+    gap: 10px;
+    margin-bottom: 20px;
+    background: var(--glass-bg);
+    padding: 5px;
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
 }
-.light-node.active-white { background: #fff; box-shadow: 0 0 15px #fff; color: #000; }
-.light-node.active-red { background: #ff3b3b; box-shadow: 0 0 15px #ff3b3b; color: #fff; }
-.light-node.active-amber { background: #ff6600; box-shadow: 0 0 15px #ff6600; color: #000; }
-
-.f-left { top: 10px; left: 10px; border-radius: 10px 4px 4px 4px; }
-.f-right { top: 10px; right: 10px; border-radius: 4px 10px 4px 4px; }
-.r-left { bottom: 10px; left: 10px; }
-.r-right { bottom: 10px; right: 10px; }
-
-@keyframes blink { 
-    0% { opacity: 1; } 
-    50% { opacity: 0.3; } 
-    100% { opacity: 1; } 
+.tab-btn {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    background: transparent;
+    color: var(--text-color);
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 400;
+    border-radius: 8px;
+    transition: all 0.3s;
+    opacity: 0.6;
 }
-.blinking { animation: blink 0.5s infinite; }
+.tab-btn.active {
+    background: var(--primary-color);
+    color: #000;
+    opacity: 1;
+    font-weight: 700;
+}
+.tab-content {
+    display: none;
+}
+.tab-content.active {
+    display: block;
+    animation: fadeIn 0.3s ease-in-out;
+}
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 )rawliteral";
 
 const char script_js[] PROGMEM = R"rawliteral(
 document.addEventListener('DOMContentLoaded', () => {
+    // Restore active tab
+    const activeTab = localStorage.getItem('activeTab') || 'main';
+    switchTab(activeTab);
+
+    // Track dirty state for alarm fields to prevent periodic sync from overwriting user input
+    ['alarmTime', 'alarmSound', 'alarmCarEff', 'alarmLedEff', 'alarmVolumeRange'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            const markDirty = () => { el.dataset.dirty = 'true'; };
+            el.addEventListener('input', markDirty);
+            el.addEventListener('change', markDirty);
+        }
+    });
+
     fetchStatus();
     setInterval(fetchStatus, 5000);
     document.getElementById('saveAlarmBtn').addEventListener('click', saveAlarm);
@@ -305,17 +331,38 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('ledColor').addEventListener('change', (e) => { setLedColor(e.target.value); });
     document.getElementById('ledBrightRange').addEventListener('change', (e) => { setLedBrightness(e.target.value); });
     document.getElementById('ledSpeedRange').addEventListener('change', (e) => { setLedSpeed(e.target.value); });
-    document.getElementById('alarmVolumeRange').addEventListener('change', (e) => { setAlarmVolume(e.target.value); });
     document.getElementById('dispBrightRange').addEventListener('change', (e) => { setDisplayBrightness(e.target.value); });
     document.getElementById('turnSignal').addEventListener('change', (e) => { setTurnSignal(e.target.value); });
     document.getElementById('frontLightsBtn').addEventListener('click', toggleFront);
     document.getElementById('rearLightsBtn').addEventListener('click', toggleRear);
-    // Schematic clicks
-    document.getElementById('visual-f-l').addEventListener('click', toggleFront);
-    document.getElementById('visual-f-r').addEventListener('click', toggleFront);
-    document.getElementById('visual-r-l').addEventListener('click', toggleRear);
-    document.getElementById('visual-r-r').addEventListener('click', toggleRear);
 });
+
+function updateField(id, newVal) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (document.activeElement === el) return;
+    if (el.dataset.dirty === 'true') return;
+    if (newVal !== undefined && newVal !== null) {
+        el.value = newVal;
+    }
+}
+
+function resetDirty(ids) {
+    ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.dataset.dirty = 'false';
+    });
+}
+
+function switchTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    
+    document.getElementById('tab-' + tabId).classList.add('active');
+    document.querySelector(`[onclick="switchTab('${tabId}')"]`).classList.add('active');
+    
+    localStorage.setItem('activeTab', tabId);
+}
 
 let frontOn = false;
 let rearOn = false;
@@ -324,11 +371,6 @@ function toggleFront() {
     frontOn = !frontOn;
     updateVisuals();
     fetch('/api/settings/car_light?front=' + (frontOn ? 1 : 0));
-}
-
-function toggleLeftFront() {
-    // Single click on schematic can also toggle all front for simplicity in this version
-    toggleFront();
 }
 
 function toggleRear() {
@@ -346,37 +388,6 @@ function updateVisuals() {
     
     btnR.textContent = rearOn ? 'Задние вкл' : 'Задние выкл';
     btnR.className = rearOn ? 'btn btn-primary' : 'btn btn-secondary';
-
-    // Update schematic nodes
-    const fl = document.getElementById('visual-f-l');
-    const fr = document.getElementById('visual-f-r');
-    const rl = document.getElementById('visual-r-l');
-    const rr = document.getElementById('visual-r-r');
-
-    fl.classList.toggle('active-white', frontOn);
-    fr.classList.toggle('active-white', frontOn);
-    rl.classList.toggle('active-red', rearOn);
-    rr.classList.toggle('active-red', rearOn);
-
-    // Turn signal visuals
-    const ts = document.getElementById('turnSignal').value;
-    fl.classList.remove('active-amber', 'blinking');
-    fr.classList.remove('active-amber', 'blinking');
-    rl.classList.remove('active-amber', 'blinking');
-    rr.classList.remove('active-amber', 'blinking');
-
-    if (ts == '1') { // Left
-        fl.classList.add('active-amber', 'blinking');
-        rl.classList.add('active-amber', 'blinking');
-    } else if (ts == '2') { // Right
-        fr.classList.add('active-amber', 'blinking');
-        rr.classList.add('active-amber', 'blinking');
-    } else if (ts == '3') { // Hazard
-        fl.classList.add('active-amber', 'blinking');
-        fr.classList.add('active-amber', 'blinking');
-        rl.classList.add('active-amber', 'blinking');
-        rr.classList.add('active-amber', 'blinking');
-    }
 }
 
 async function fetchStatus() {
@@ -387,18 +398,30 @@ async function fetchStatus() {
         document.getElementById('timeValue').textContent = data.time;
         document.getElementById('tempValue').textContent = data.temp + '\u00B0C';
         document.getElementById('weatherValue').textContent = translateCondition(data.condition);
+        document.getElementById('cityValue').textContent = translateCity(data.city);
         document.getElementById('connectionStatus').className = 'status-indicator online';
         
-        // Update inputs if not focused (simple sync)
-        if(document.activeElement !== document.getElementById('timeZone') && data.tz) {
-             document.getElementById('timeZone').value = data.tz;
+        // Update Alarm Badge and Time
+        const badge = document.getElementById('savedAlarmBadge');
+        if (data.alarm_enabled) {
+            badge.textContent = data.alarm_time;
+            badge.style.background = 'var(--primary-color)';
+            badge.style.color = '#000';
+        } else {
+            badge.textContent = 'Выкл';
+            badge.style.background = 'rgba(255,255,255,0.1)';
+            badge.style.color = 'inherit';
         }
-        if(document.activeElement !== document.getElementById('weatherCity') && data.city) {
-             document.getElementById('weatherCity').value = data.city;
-        }
-        if(document.activeElement !== document.getElementById('alarmVolumeRange') && data.alarm_volume !== undefined) {
-             document.getElementById('alarmVolumeRange').value = data.alarm_volume;
-        }
+
+        // Update inputs if not focused and not modified by user
+        updateField('alarmTime', data.alarm_time);
+        updateField('alarmSound', data.alarm_sound);
+        updateField('alarmCarEff', data.alarm_car_eff);
+        updateField('alarmLedEff', data.alarm_led_eff);
+        updateField('alarmVolumeRange', data.alarm_volume);
+        
+        updateField('timeZone', data.tz);
+        updateField('weatherCity', data.city);
 
         // WiFi Status UI
         const wifiForm = document.getElementById('wifiConnectForm');
@@ -419,13 +442,39 @@ function translateCondition(c) {
     const t = {'Clear':'Ясно','Clouds':'Облачно','Rain':'Дождь','Snow':'Снег','Thunderstorm':'Гроза','Drizzle':'Морось','Mist':'Туман','Fog':'Туман','Haze':'Дымка'};
     return t[c] || c;
 }
+function translateCity(c) {
+    const t = {
+        'Almaty':'Алматы','Astana':'Астана','Shymkent':'Шымкент','Aktobe':'Актобе',
+        'Karaganda':'Караганда','Taraz':'Тараз','Pavlodar':'Павлодар',
+        'Ust-Kamenogorsk':'Усть-Каменогорск','Semey':'Семей','Aktau':'Актау',
+        'Kostanay':'Костанай','Kyzylorda':'Кызылорда','Atyrau':'Атырау',
+        'Petropavl':'Петропавловск','Rudny':'Рудный'
+    };
+    return t[c] || c;
+}
 async function saveAlarm() {
     const time = document.getElementById('alarmTime').value;
     const sound = document.getElementById('alarmSound').value;
+    const carEff = document.getElementById('alarmCarEff').value;
+    const ledEff = document.getElementById('alarmLedEff').value;
+    const volume = document.getElementById('alarmVolumeRange').value;
     if (!time) return alert('Пожалуйста, выберите время');
     try {
-        await fetch('/api/alarm/set', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ time: time, sound: sound }) });
+        await fetch('/api/alarm/set', { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ 
+                time: time, 
+                sound: Number(sound),
+                carEff: Number(carEff),
+                ledEff: Number(ledEff),
+                volume: Number(volume),
+                enabled: true
+            }) 
+        });
         alert('Будильник сохранен!');
+        resetDirty(['alarmTime', 'alarmSound', 'alarmCarEff', 'alarmLedEff', 'alarmVolumeRange']);
+        fetchStatus();
     } catch (e) { alert('Ошибка при сохранении будильника'); }
 }
 async function saveWifi() {
@@ -484,7 +533,6 @@ async function setLedColor(val) {
     fetch('/api/settings/led_color?hex=' + encodeURIComponent(val));
 }
 async function setTurnSignal(val) {
-    updateVisuals();
     fetch('/api/settings/turn_signal?mode=' + val);
 }
 async function rebootSystem() {

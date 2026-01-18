@@ -265,7 +265,7 @@ void DisplayDriver::drawAPInfo(String ssid, String pass, String ip) {
   drawQRCode(qrData, qrX, qrY, qrScale);
 
   // Footer text - Using 9pt to fit within ~180px (QR width)
-  String url = "artem.landcruiser.local";
+  String url = "artemlandcruiser.local";
   gfx->setFont(&FreeSans9pt7b);
   gfx->setTextSize(1);
 

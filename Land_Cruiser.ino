@@ -79,7 +79,13 @@ void TaskNetwork(void *pvParameters) {
       Serial.println("ALARM TRIGGERED!");
       audio.setVolume(network.getAlarmVolume());
       audio.playAlarmSound(network.getAlarmSoundId());
-      led.setModeAlarm();
+
+      // Use user-selected effects for car lights and underglow
+      LedDriver::AlarmCarEffect carEff =
+          (LedDriver::AlarmCarEffect)network.getAlarmCarEffect();
+      LedDriver::LedEffect ledEff =
+          (LedDriver::LedEffect)network.getAlarmLedEffect();
+      led.setModeAlarm(carEff, ledEff);
     }
     vTaskDelay(pdMS_TO_TICKS(100)); // More frequent check for queue/alarm
   }

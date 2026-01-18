@@ -2,7 +2,8 @@
 #define DISPLAY_DRIVER_H
 
 #include "Digits_Data.h"
-#include "FreeSansBold12pt7b.h"
+#include "FreeSans12pt7b.h"
+#include "FreeSansBold18pt7b.h"
 #include "config.h"
 #include <Arduino_GFX_Library.h>
 

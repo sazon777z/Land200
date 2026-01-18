@@ -5,6 +5,7 @@
 
 // Шрифты Adafruit GFX для красивого отображения (используем локальные копии)
 #include "Digits_Data.h"
+#include "FreeSans9pt7b.h"      // Новый уменьшенный шрифт для AP Info
 #include "FreeSansBold18pt7b.h" // Для масштабирования x2 (~72px)
 #include "FreeSansBold24pt7b.h"
 #include "WeatherIcons_Bitmap.h" // Наши новые ОБЪЕМНЫЕ иконки погоды
@@ -255,25 +256,29 @@ void DisplayDriver::drawAPInfo(String ssid, String pass, String ip) {
   String qrData = "WIFI:S:" + ssid + ";T:WPA;P:" + pass + ";;";
 
   // QR Version 3 is 29x29. Scale x6 = 174px.
+  // SCREEN_WIDTH is 240. (240 - 174) / 2 = 33px margin.
   int qrScale = 6;
   int qrSize = 29 * qrScale;
   int qrX = (SCREEN_WIDTH - qrSize) / 2;
-  int qrY = 30; // 30px from top
+  int qrY = 40; // Positioned for balance
 
   drawQRCode(qrData, qrX, qrY, qrScale);
 
-  // Footer text
+  // Footer text - Using 9pt to fit within ~180px (QR width)
   String url = "artem.landcruiser.local";
-  gfx->setFont(
-      &FreeSansBold12pt7b); // Используем 12pt для умеренно крупного размера
+  gfx->setFont(&FreeSans9pt7b);
   gfx->setTextSize(1);
 
   int16_t tx1, ty1;
   uint16_t tw, th;
   gfx->getTextBounds(url.c_str(), 0, 0, &tx1, &ty1, &tw, &th);
 
+  // Centering text horizontally
   int txPos = (SCREEN_WIDTH - tw) / 2;
-  int tyPos = 320 - 40; // 40px from bottom
+
+  // Vertical position in the area below QR
+  // Area starts from QR end (40 + 174 = 214) + 15px padding (229) to 320.
+  int tyPos = 229 + (320 - 229 + th) / 2;
 
   gfx->setTextColor(CYAN);
   gfx->setCursor(txPos, tyPos);

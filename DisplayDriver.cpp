@@ -228,19 +228,15 @@ void DisplayDriver::drawConnecting(String ssid) {
 // Function to draw QR Code
 // Requires 'qrcode' library by Richard Moore to be installed
 
-void DisplayDriver::drawQRCode(String data) {
+void DisplayDriver::drawQRCode(String data, int startX, int startY, int scale) {
   QRCode qrcode;
-  uint8_t version = 3;
+  uint8_t version = 3; // 29x29 modules
   uint8_t qrcodeData[qrcode_getBufferSize(version)];
   qrcode_initText(&qrcode, qrcodeData, version, ECC_LOW, data.c_str());
 
-  int scale = 4; // 29*4 = 116px size
-  int startX = (SCREEN_WIDTH - qrcode.size * scale) / 2;
-  int startY = (SCREEN_HEIGHT - qrcode.size * scale) / 2 - 20;
-
-  // Draw background for QR
-  gfx->fillRect(startX - 5, startY - 5, (qrcode.size * scale) + 10,
-                (qrcode.size * scale) + 10, WHITE);
+  // Draw white background for QR with padding
+  gfx->fillRect(startX - 10, startY - 10, (qrcode.size * scale) + 20,
+                (qrcode.size * scale) + 20, WHITE);
 
   for (uint8_t y = 0; y < qrcode.size; y++) {
     for (uint8_t x = 0; x < qrcode.size; x++) {
@@ -255,37 +251,33 @@ void DisplayDriver::drawQRCode(String data) {
 void DisplayDriver::drawAPInfo(String ssid, String pass, String ip) {
   gfx->fillScreen(BLACK);
 
-  // Header
-  gfx->setTextColor(CYAN, BLACK);
-  gfx->setTextSize(2);
-  gfx->setCursor(20, 10);
-  gfx->print("Scan to Config"); // Changed title
-
-  // QR Code - WiFi Connection string
-  // Format: WIFI:S:<SSID>;T:WPA;P:<PASS>;;
+  // WiFi:S:<SSID>;T:WPA;P:<PASS>;;
   String qrData = "WIFI:S:" + ssid + ";T:WPA;P:" + pass + ";;";
-  drawQRCode(qrData);
 
-  // Text Info under QR
-  int textY = 230;
-  gfx->setTextColor(WHITE, BLACK);
+  // QR Version 3 is 29x29. Scale x6 = 174px.
+  int qrScale = 6;
+  int qrSize = 29 * qrScale;
+  int qrX = (SCREEN_WIDTH - qrSize) / 2;
+  int qrY = 30; // 30px from top
+
+  drawQRCode(qrData, qrX, qrY, qrScale);
+
+  // Footer text
+  String url = "artem.landcruiser.local";
+  gfx->setFont(
+      &FreeSansBold12pt7b); // Используем 12pt для умеренно крупного размера
   gfx->setTextSize(1);
 
-  gfx->setCursor(10, textY);
-  gfx->print("1. Connect WiFi:");
+  int16_t tx1, ty1;
+  uint16_t tw, th;
+  gfx->getTextBounds(url.c_str(), 0, 0, &tx1, &ty1, &tw, &th);
 
-  gfx->setCursor(10, textY + 15);
-  gfx->setTextColor(YELLOW, BLACK);
-  gfx->print("SSID: ");
-  gfx->print(ssid);
+  int txPos = (SCREEN_WIDTH - tw) / 2;
+  int tyPos = 320 - 40; // 40px from bottom
 
-  gfx->setCursor(10, textY + 30);
-  gfx->print("Pass: ");
-  gfx->print(pass);
+  gfx->setTextColor(CYAN);
+  gfx->setCursor(txPos, tyPos);
+  gfx->print(url);
 
-  gfx->setCursor(10, textY + 50);
-  gfx->setTextColor(GREEN, BLACK);
-  gfx->print("2. Go to URL:");
-  gfx->setCursor(10, textY + 65);
-  gfx->print("artemLandCruiser.local");
+  gfx->setFont(NULL); // Reset font
 }

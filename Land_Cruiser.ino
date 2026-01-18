@@ -78,7 +78,7 @@ void TaskNetwork(void *pvParameters) {
     if (network.checkAlarmTrigger()) {
       Serial.println("ALARM TRIGGERED!");
       audio.setVolume(network.getAlarmVolume());
-      audio.playAlarmSound(); // Uses queue
+      audio.playAlarmSound(network.getAlarmSoundId());
       led.setModeAlarm();
     }
     vTaskDelay(pdMS_TO_TICKS(100)); // More frequent check for queue/alarm

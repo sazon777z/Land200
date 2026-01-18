@@ -55,10 +55,10 @@ void AudioDriver::setVolume(uint8_t volume) {
   xQueueSend(audioQueue, &cmd, 0);
 }
 
-void AudioDriver::playAlarmSound() {
+void AudioDriver::playAlarmSound(int trackNumber) {
   if (audioQueue == NULL)
     return;
-  AudioCommand cmd = {CMD_PLAY_ALARM, 0};
+  AudioCommand cmd = {CMD_PLAY_ALARM, trackNumber};
   xQueueSend(audioQueue, &cmd, 0);
 }
 
@@ -80,7 +80,7 @@ void AudioDriver::processQueue() {
       executeVolume(cmd.data);
       break;
     case CMD_PLAY_ALARM:
-      executePlay(1);
+      executePlay(cmd.data);
       break;
     }
   }

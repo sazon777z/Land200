@@ -7,7 +7,6 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 
-
 // Типы команд для аудио-очереди
 enum AudioCmdType { CMD_PLAY, CMD_STOP, CMD_SET_VOLUME, CMD_PLAY_ALARM };
 
@@ -23,7 +22,7 @@ public:
   void playTrack(int trackNumber);
   void stop();
   void setVolume(uint8_t volume);
-  void playAlarmSound();
+  void playAlarmSound(int trackNumber);
 
   // Метод для обработки очереди (вызывается в отдельной задаче)
   void processQueue();

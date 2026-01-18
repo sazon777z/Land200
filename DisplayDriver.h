@@ -2,6 +2,7 @@
 #define DISPLAY_DRIVER_H
 
 #include "Digits_Data.h"
+#include "FreeSansBold12pt7b.h"
 #include "config.h"
 #include <Arduino_GFX_Library.h>
 
@@ -21,9 +22,9 @@ public:
   void begin();
   void drawClock(int hour, int minute, int second);
   void drawWeather(float temp, String condition, String icon);
-  void drawConnecting(String ssid);                     // New method
-  void drawQRCode(String data);                         // New QR Code method
-  void drawAPInfo(String ssid, String pass, String ip); // New AP Info method
+  void drawConnecting(String ssid);
+  void drawQRCode(String data, int startX, int startY, int scale);
+  void drawAPInfo(String ssid, String pass, String ip);
   void setBrightness(uint8_t brightness);
 
 private:

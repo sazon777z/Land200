@@ -2,7 +2,7 @@
 
 LedDriver::LedDriver()
     : strip(NUM_LEDS, PIN_WS2812, NEO_GRB + NEO_KHZ800), lastUpdate(0),
-      animationStep(0), currentEffect(RAINBOW), solidColor(0x00D2FF),
+      animationStep(0), currentEffect(OFF), solidColor(0x00D2FF),
       currentBrightness(150), effectSpeed(30), alarmState(false),
       headlightsOn(false), taillightsOn(false), turnSignalMode(TS_OFF) {}
 
@@ -68,27 +68,36 @@ void LedDriver::update() {
     strip.setPixelColor(6, rearColor);
     strip.setPixelColor(7, rearColor);
 
-    // Turn Signal Logic (Blinking amber/yellow)
-    static bool turnFlash = false;
-    static uint32_t lastTurnUpdate = 0;
-    if (millis() - lastTurnUpdate > 500) {
-      turnFlash = !turnFlash;
-      lastTurnUpdate = millis();
-    }
+    // Turn Signal Logic (Smooth fading amber)
+    if (turnSignalMode != TS_OFF) {
+      uint32_t ms = millis() % 700;
+      uint8_t amberBright = 0;
 
-    if (turnFlash && turnSignalMode != TS_OFF) {
-      uint32_t amber = strip.Color(255, 80, 0);
-      if (turnSignalMode == TS_LEFT) {
-        strip.setPixelColor(4, amber);
-        strip.setPixelColor(6, amber); // Front-left and Rear-left
-      } else if (turnSignalMode == TS_RIGHT) {
-        strip.setPixelColor(5, amber);
-        strip.setPixelColor(7, amber); // Front-right and Rear-right
-      } else if (turnSignalMode == TS_HAZARD) {
-        strip.setPixelColor(4, amber);
-        strip.setPixelColor(5, amber);
-        strip.setPixelColor(6, amber);
-        strip.setPixelColor(7, amber);
+      if (ms < 150) { // Fade in
+        amberBright = map(ms, 0, 150, 0, 255);
+      } else if (ms < 350) { // Full bright stay
+        amberBright = 255;
+      } else if (ms < 500) { // Fade out
+        amberBright = map(ms, 350, 500, 255, 0);
+      } else { // Pause
+        amberBright = 0;
+      }
+
+      if (amberBright > 0) {
+        uint32_t amber =
+            strip.Color((255 * amberBright) / 255, (45 * amberBright) / 255, 0);
+        if (turnSignalMode == TS_LEFT) {
+          strip.setPixelColor(4, amber);
+          strip.setPixelColor(6, amber); // Front-left and Rear-left
+        } else if (turnSignalMode == TS_RIGHT) {
+          strip.setPixelColor(5, amber);
+          strip.setPixelColor(7, amber); // Front-right and Rear-right
+        } else if (turnSignalMode == TS_HAZARD) {
+          strip.setPixelColor(4, amber);
+          strip.setPixelColor(5, amber);
+          strip.setPixelColor(6, amber);
+          strip.setPixelColor(7, amber);
+        }
       }
     }
   }

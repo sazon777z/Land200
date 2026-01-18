@@ -175,11 +175,13 @@ const char index_html[] PROGMEM = R"rawliteral(
             </div>
 
             <div id="tab-effects" class="tab-content">
-                <!-- Underglow Lights -->
+                <!-- Lighting Effects -->
                 <section class="glass-card">
-                    <h2>Подсветка днища</h2>
+                    <h2>Эффекты подсветки</h2>
+                    
+                    <!-- Underglow Controls -->
                     <div class="control-group">
-                        <label>Эффект</label>
+                        <label>Эффект днища</label>
                         <select id="ledEffect">
                             <option value="0">Выкл</option>
                             <option value="1">Радуга</option>
@@ -192,38 +194,42 @@ const char index_html[] PROGMEM = R"rawliteral(
                             <option value="8">Рыцарь дорог</option>
                         </select>
                     </div>
-                    <div class="control-group">
-                        <label>Цвет (для статики и дыхания)</label>
-                        <input type="color" id="ledColor" value="#00d2ff" style="height: 45px; cursor: pointer;">
-                    </div>
-                    <div class="control-group">
-                        <label>Яркость</label>
-                        <input type="range" id="ledBrightRange" min="0" max="255" value="150">
-                    </div>
-                    <div class="control-group">
-                        <label>Скорость</label>
-                        <input type="range" id="ledSpeedRange" min="1" max="100" value="30">
-                    </div>
-                </section>
-
-                <!-- Vehicle Configuration (Moved) -->
-                <section class="glass-card">
-                    <h2>Конфигурация фар</h2>
-                    <div class="control-group">
-                        <label>Управление светом</label>
-                        <div class="button-group">
-                            <button class="btn btn-secondary" id="frontLightsBtn">Фары выкл</button>
-                            <button class="btn btn-secondary" id="rearLightsBtn">Задние выкл</button>
+                    
+                    <div class="info-grid">
+                        <div class="control-group">
+                            <label>Цвет</label>
+                            <input type="color" id="ledColor" value="#00d2ff" style="height: 45px; cursor: pointer; padding: 5px;">
+                        </div>
+                        <div class="control-group">
+                            <label>Яркость</label>
+                            <input type="range" id="ledBrightRange" min="0" max="255" value="150">
                         </div>
                     </div>
+                    
                     <div class="control-group">
-                        <label>Поворотники</label>
-                        <select id="turnSignal">
-                            <option value="0">Выкл</option>
-                            <option value="1">Влево</option>
-                            <option value="2">Вправо</option>
-                            <option value="3">Аварийка</option>
-                        </select>
+                        <label>Скорость эффектов</label>
+                        <input type="range" id="ledSpeedRange" min="1" max="100" value="30">
+                    </div>
+
+                    <div style="margin-top: 20px; border-top: 1px solid var(--glass-border); padding-top: 20px;">
+                        <label style="margin-bottom: 15px; display: block; text-align: center; opacity: 0.8;">Управление фарами</label>
+                        <div class="light-controls-grid">
+                            <button class="icon-btn" id="btnLowBeam" title="Ближний свет">
+                                <svg viewBox="0 0 24 24"><path d="M13,4.83V19.17c3.42-0.41,6.04-3.52,6.04-7.17S16.42,5.24,13,4.83z M1,7h8v2H1V7z M3,11h6v2H3V11z M5,15h4v2H5V15z"/></svg>
+                            </button>
+                            <button class="icon-btn" id="btnParking" title="Габариты">
+                                <svg viewBox="0 0 24 24"><path d="M12,2C6.48,2,2,6.48,2,12s4.48,10,10,10s10-4.48,10-10S17.52,2,12,2z M12,20c-4.42,0-8-3.58-8-8s3.58-8,8-8s8,3.58,8,8 S16.42,20,12,20z M11,7h2v2h-2V7z M11,11h2v6h-2V11z"/></svg>
+                            </button>
+                            <button class="icon-btn" id="btnTurnLeft" title="Левый поворот">
+                                <svg viewBox="0 0 24 24"><path d="M20,9V15H12V19.84L4.16,12L12,4.16V9H20Z"/></svg>
+                            </button>
+                            <button class="icon-btn" id="btnTurnRight" title="Правый поворот">
+                                <svg viewBox="0 0 24 24"><path d="M4,15V9H12V4.16L19.84,12L12,19.84V15H4Z"/></svg>
+                            </button>
+                            <button class="icon-btn btn-hazard" id="btnHazard" title="Аварийка">
+                                <svg viewBox="0 0 24 24"><path d="M12,2L1,21H23L12,2M12,6L19.53,19H4.47L12,6M11,10V14H13V10H11M11,16V18H13V16H11Z"/></svg>
+                            </button>
+                        </div>
                     </div>
                 </section>
             </div>
@@ -328,6 +334,59 @@ input[type="time"], select, input[type="range"], input[type="text"], input[type=
     to { opacity: 1; transform: translateY(0); }
 }
 
+/* Light Control Icons */
+.light-controls-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    justify-items: center;
+}
+.icon-btn {
+    width: 50px;
+    height: 50px;
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.05);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    padding: 10px;
+}
+.icon-btn svg {
+    width: 24px;
+    height: 24px;
+    fill: rgba(255, 255, 255, 0.6);
+    transition: all 0.2s;
+}
+.icon-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+.icon-btn.active {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    box-shadow: 0 0 15px rgba(0, 210, 255, 0.4);
+}
+.icon-btn.active svg {
+    fill: #000;
+}
+.icon-btn.btn-hazard.active {
+    background: #ff3b3b;
+    border-color: #ff3b3b;
+    box-shadow: 0 0 15px rgba(255, 59, 59, 0.4);
+}
+.icon-btn.btn-hazard svg {
+    fill: rgba(255, 59, 59, 0.6);
+}
+.icon-btn.btn-hazard.active svg {
+    fill: #fff;
+}
+@media (max-width: 380px) {
+    .light-controls-grid { gap: 5px; }
+    .icon-btn { width: 45px; height: 45px; padding: 8px; }
+}
+
 )rawliteral";
 
 const char script_js[] PROGMEM = R"rawliteral(
@@ -367,9 +426,13 @@ document.addEventListener('DOMContentLoaded', () => {
     addListener('ledSpeedRange', 'input', (e) => { setLedSpeed(e.target.value); });
     addListener('dispBrightRange', 'input', (e) => { setDisplayBrightness(e.target.value); });
     addListener('alarmVolumeRange', 'input', (e) => { setAlarmVolume(e.target.value); });
-    addListener('turnSignal', 'change', (e) => { setTurnSignal(e.target.value); });
-    addListener('frontLightsBtn', 'click', toggleFront);
-    addListener('rearLightsBtn', 'click', toggleRear);
+    
+    // New Light Controls
+    addListener('btnLowBeam', 'click', toggleLowBeam);
+    addListener('btnParking', 'click', toggleParking);
+    addListener('btnTurnLeft', 'click', () => toggleTurn(1));
+    addListener('btnTurnRight', 'click', () => toggleTurn(2));
+    addListener('btnHazard', 'click', () => toggleTurn(3));
 });
 
 function updateField(id, newVal) {
@@ -401,28 +464,36 @@ function switchTab(tabId) {
 
 let frontOn = false;
 let rearOn = false;
+let currentTS = 0; // 0:off, 1:left, 2:right, 3:hazard
 
-function toggleFront() {
+function toggleLowBeam() {
     frontOn = !frontOn;
+    rearOn = frontOn; // Low beam usually implies both
     updateVisuals();
-    fetch('/api/settings/car_light?front=' + (frontOn ? 1 : 0));
+    fetch(`/api/settings/car_light?front=${frontOn?1:0}&rear=${rearOn?1:0}`);
 }
 
-function toggleRear() {
+function toggleParking() {
     rearOn = !rearOn;
+    if (!rearOn) frontOn = false; // Turn off front if parking is off? Or just toggle rear
     updateVisuals();
-    fetch('/api/settings/car_light?rear=' + (rearOn ? 1 : 0));
+    fetch(`/api/settings/car_light?rear=${rearOn?1:0}`);
+}
+
+function toggleTurn(mode) {
+    if (currentTS === mode) currentTS = 0;
+    else currentTS = mode;
+    updateVisuals();
+    fetch('/api/settings/turn_signal?mode=' + currentTS);
 }
 
 function updateVisuals() {
-    const btnF = document.getElementById('frontLightsBtn');
-    const btnR = document.getElementById('rearLightsBtn');
-    
-    btnF.textContent = frontOn ? 'Фары вкл' : 'Фары выкл';
-    btnF.className = frontOn ? 'btn btn-primary' : 'btn btn-secondary';
-    
-    btnR.textContent = rearOn ? 'Задние вкл' : 'Задние выкл';
-    btnR.className = rearOn ? 'btn btn-primary' : 'btn btn-secondary';
+    // Update Icons
+    document.getElementById('btnLowBeam').classList.toggle('active', frontOn);
+    document.getElementById('btnParking').classList.toggle('active', rearOn);
+    document.getElementById('btnTurnLeft').classList.toggle('active', currentTS === 1);
+    document.getElementById('btnTurnRight').classList.toggle('active', currentTS === 2);
+    document.getElementById('btnHazard').classList.toggle('active', currentTS === 3);
 }
 
 async function fetchStatus() {

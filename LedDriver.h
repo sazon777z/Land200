@@ -3,6 +3,7 @@
 
 #include "config.h"
 #include <Adafruit_NeoPixel.h>
+#include <Arduino.h>
 
 class LedDriver {
 public:

@@ -176,6 +176,34 @@ const char index_html[] PROGMEM = R"rawliteral(
 
             <div id="tab-effects" class="tab-content">
                 <!-- Underglow Lights -->
+                <section class="glass-card">
+                    <h2>Подсветка днища</h2>
+                    <div class="control-group">
+                        <label>Эффект</label>
+                        <select id="ledEffect">
+                            <option value="0">Выкл</option>
+                            <option value="1">Радуга</option>
+                            <option value="2">Статичный цвет</option>
+                            <option value="3">Дыхание</option>
+                            <option value="4">Полиция</option>
+                            <option value="5">Стробоскоп</option>
+                            <option value="6">Затухание</option>
+                            <option value="7">Мерцание</option>
+                            <option value="8">Рыцарь дорог</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Цвет (для статики и дыхания)</label>
+                        <input type="color" id="ledColor" value="#00d2ff" style="height: 45px; cursor: pointer;">
+                    </div>
+                    <div class="control-group">
+                        <label>Яркость</label>
+                        <input type="range" id="ledBrightRange" min="0" max="255" value="150">
+                    </div>
+                    <div class="control-group">
+                        <label>Скорость</label>
+                        <input type="range" id="ledSpeedRange" min="1" max="100" value="30">
+                    </div>
                 </section>
 
                 <!-- Vehicle Configuration (Moved) -->
@@ -320,21 +348,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     fetchStatus();
     setInterval(fetchStatus, 5000);
-    document.getElementById('saveAlarmBtn').addEventListener('click', saveAlarm);
-    document.getElementById('saveWifiBtn').addEventListener('click', saveWifi);
-    document.getElementById('resetWifiBtn').addEventListener('click', resetWifi);
-    document.getElementById('saveLocBtn').addEventListener('click', saveLoc);
-    document.getElementById('testSoundBtn').addEventListener('click', testSound);
-    document.getElementById('stopSoundBtn').addEventListener('click', stopSound);
-    document.getElementById('rebootBtn').addEventListener('click', rebootSystem);
-    document.getElementById('ledEffect').addEventListener('change', (e) => { setLedEffect(e.target.value); });
-    document.getElementById('ledColor').addEventListener('change', (e) => { setLedColor(e.target.value); });
-    document.getElementById('ledBrightRange').addEventListener('change', (e) => { setLedBrightness(e.target.value); });
-    document.getElementById('ledSpeedRange').addEventListener('change', (e) => { setLedSpeed(e.target.value); });
-    document.getElementById('dispBrightRange').addEventListener('change', (e) => { setDisplayBrightness(e.target.value); });
-    document.getElementById('turnSignal').addEventListener('change', (e) => { setTurnSignal(e.target.value); });
-    document.getElementById('frontLightsBtn').addEventListener('click', toggleFront);
-    document.getElementById('rearLightsBtn').addEventListener('click', toggleRear);
+
+    const addListener = (id, event, fn) => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener(event, fn);
+    };
+
+    addListener('saveAlarmBtn', 'click', saveAlarm);
+    addListener('saveWifiBtn', 'click', saveWifi);
+    addListener('resetWifiBtn', 'click', resetWifi);
+    addListener('saveLocBtn', 'click', saveLoc);
+    addListener('testSoundBtn', 'click', testSound);
+    addListener('stopSoundBtn', 'click', stopSound);
+    addListener('rebootBtn', 'click', rebootSystem);
+    addListener('ledEffect', 'change', (e) => { setLedEffect(e.target.value); });
+    addListener('ledColor', 'change', (e) => { setLedColor(e.target.value); });
+    addListener('ledBrightRange', 'input', (e) => { setLedBrightness(e.target.value); });
+    addListener('ledSpeedRange', 'input', (e) => { setLedSpeed(e.target.value); });
+    addListener('dispBrightRange', 'input', (e) => { setDisplayBrightness(e.target.value); });
+    addListener('alarmVolumeRange', 'input', (e) => { setAlarmVolume(e.target.value); });
+    addListener('turnSignal', 'change', (e) => { setTurnSignal(e.target.value); });
+    addListener('frontLightsBtn', 'click', toggleFront);
+    addListener('rearLightsBtn', 'click', toggleRear);
 });
 
 function updateField(id, newVal) {

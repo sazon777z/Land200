@@ -61,8 +61,7 @@ void WebManager::setupRoutes() {
   server.on("/api/sound/test", HTTP_GET, [this]() {
     if (server.hasArg("id")) {
       int soundId = server.arg("id").toInt();
-      audio->setVolume(
-          net->getAlarmVolume()); // Use current alarm volume for test
+      audio->setVolume(net->getAlarmVolume());
       audio->playTrack(soundId);
     }
     server.send(200, "text/plain", "OK");
@@ -104,6 +103,7 @@ void WebManager::setupRoutes() {
     if (server.hasArg("val")) {
       int val = server.arg("val").toInt();
       display->setBrightness(val);
+      Serial.printf("Display: Set brightness to %d\n", val);
     }
     server.send(200, "text/plain", "OK");
   });

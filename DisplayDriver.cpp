@@ -4,9 +4,15 @@
 #include <Arduino_GFX_Library.h>
 
 // Шрифты Adafruit GFX для красивого отображения (используем локальные копии)
+#include "Digits_Data.h"
 #include "FreeSansBold18pt7b.h" // Для масштабирования x2 (~72px)
 #include "FreeSansBold24pt7b.h"
 #include "WeatherIcons_Bitmap.h" // Наши новые ОБЪЕМНЫЕ иконки погоды
+
+// Определение массива указателей на цифры (было перенесено из Digits_Data.h для
+// устранения multiple definition)
+const uint16_t *digits_all[] = {digit_0, digit_1, digit_2, digit_3, digit_4,
+                                digit_5, digit_6, digit_7, digit_8, digit_9};
 
 // Предыдущие значения для предотвращения мерцания
 static int prevHour = -1;
@@ -25,21 +31,45 @@ DisplayDriver::DisplayDriver() {
   // ILI9341 240x320
   gfx =
       new Arduino_ILI9341(bus, PIN_LCD_RST, 0 /* rotation */, false /* IPS */);
+
+  // Initialize Clock Canvas (Buffer)
+  // Position y=40 on hardware, size 240x100
+  clockCanvas = new Arduino_Canvas(240, 100, gfx, 0, 40);
+
+  // Initialize Weather Canvas (Buffer)
+  // Position y=180 on hardware, size 240x135
+  weatherCanvas = new Arduino_Canvas(240, 135, gfx, 0, 180);
 }
+
+// PWM Channel for Backlight (0-15)
+// PWM Channel definition removed for ESP32 Core 3.x compatibility
 
 void DisplayDriver::begin() {
   gfx->begin();
   gfx->fillScreen(BLACK);
 
-  // Initialize backlight
+// Initialize backlight with PWM
+#ifdef PIN_LCD_BL
   pinMode(PIN_LCD_BL, OUTPUT);
-  analogWrite(PIN_LCD_BL, 255); // Full brightness initially
+  ledcAttach(PIN_LCD_BL, 5000, 8); // 5 kHz, 8 bit resolution
+  ledcWrite(PIN_LCD_BL, 255);      // Full brightness initially
+  Serial.println("Display: Backlight PWM initialized");
+#endif
+
+  clockCanvas->begin();
+  clockCanvas->fillScreen(BLACK);
+
+  weatherCanvas->begin();
+  weatherCanvas->fillScreen(BLACK);
 
   drawBackground();
 }
 
 void DisplayDriver::setBrightness(uint8_t brightness) {
-  analogWrite(PIN_LCD_BL, brightness);
+#ifdef PIN_LCD_BL
+  ledcWrite(PIN_LCD_BL, brightness);
+  // gfx->flush() не нужен для подсветки, так как это аппаратный PWM
+#endif
 }
 
 void DisplayDriver::drawBackground() {
@@ -60,130 +90,121 @@ void DisplayDriver::drawClock(int hour, int minute, int second) {
   prevSecond = second;
   colonVisible = !colonVisible;
 
-  // Очищаем ВЕРХНЮЮ половину экрана
-  gfx->fillRect(0, 40, SCREEN_WIDTH, 110, BLACK);
+  // 1. Очищаем буфер часов
+  clockCanvas->fillScreen(BLACK);
 
-  // Используем САМЫЙ КРУПНЫЙ шрифт
-  gfx->setFont(&FreeSansBold24pt7b);
-  gfx->setTextSize(2);
+  // 2. Рисуем цифры в буфер
+  int totalWidth = (4 * DIGIT_WIDTH) + COLON_WIDTH + (4 * 2);
+  int startX = (240 - totalWidth) / 2;
+  int yPos = (100 - DIGIT_HEIGHT) / 2;
 
-  char timeStr[6];
+  // Часы
+  clockCanvas->draw16bitRGBBitmap(startX, yPos,
+                                  (uint16_t *)digits_all[hour / 10],
+                                  DIGIT_WIDTH, DIGIT_HEIGHT);
+  startX += DIGIT_WIDTH + 2;
+  clockCanvas->draw16bitRGBBitmap(startX, yPos,
+                                  (uint16_t *)digits_all[hour % 10],
+                                  DIGIT_WIDTH, DIGIT_HEIGHT);
+  startX += DIGIT_WIDTH + 2;
+
+  // Двоеточие
   if (colonVisible) {
-    sprintf(timeStr, "%02d:%02d", hour, minute);
-  } else {
-    sprintf(timeStr, "%02d %02d", hour, minute);
+    clockCanvas->draw16bitRGBBitmap(startX, yPos, (uint16_t *)digit_colon,
+                                    COLON_WIDTH, DIGIT_HEIGHT);
   }
+  startX += COLON_WIDTH + 2;
 
-  // Точный расчет границ для центрирования
-  int16_t x1, y1;
-  uint16_t w, h;
-  gfx->getTextBounds(timeStr, 0, 0, &x1, &y1, &w, &h);
+  // Минуты
+  clockCanvas->draw16bitRGBBitmap(startX, yPos,
+                                  (uint16_t *)digits_all[minute / 10],
+                                  DIGIT_WIDTH, DIGIT_HEIGHT);
+  startX += DIGIT_WIDTH + 2;
+  clockCanvas->draw16bitRGBBitmap(startX, yPos,
+                                  (uint16_t *)digits_all[minute % 10],
+                                  DIGIT_WIDTH, DIGIT_HEIGHT);
 
-  int xPos = (SCREEN_WIDTH - w) / 2;
-  int yPos = 125;
-
-  // 1. Эффект тени (глубина)
-  gfx->setTextColor(CLR_DGRAY);
-  gfx->setCursor(xPos + 4, yPos + 4);
-  gfx->print(timeStr);
-
-  // 2. Основной текст
-  gfx->setTextColor(WHITE);
-  gfx->setCursor(xPos, yPos);
-  gfx->print(timeStr);
-
-  gfx->setFont(NULL);
-  gfx->setTextSize(1);
+  // 3. Выводим буфер на экран
+  clockCanvas->flush();
 }
 
 void DisplayDriver::drawWeather(float temp, String condition, String icon) {
   bool isNight = icon.endsWith("n");
 
-  // Check what changed
+  // Проверка изменений
   bool tempChanged = (abs(temp - prevTemp) >= 0.1);
   bool conditionChanged = (condition != prevCondition || icon != prevIconStr);
 
-  if (!tempChanged && !conditionChanged)
+  if (!tempChanged && !conditionChanged && prevTemp != -999)
     return;
 
-  // Draw Separator only if it might have been cleared or first run
-  // (simplification: just draw it if anything changed, it's fast) Or better:
-  // Draw it once? For now, we assume background is black. Let's protect the
-  // separator line area (y=180). We draw below it.
-  if (prevTemp == -999) { // First run
-    gfx->drawLine(20, 180, SCREEN_WIDTH - 20, 180, CLR_DGRAY);
-  }
+  // Сохраняем значения
+  prevTemp = temp;
+  prevCondition = condition;
+  prevIconStr = icon;
 
-  // 1. UPDATE ICON
-  if (conditionChanged || prevTemp == -999) {
-    prevCondition = condition;
-    prevIconStr = icon;
+  // 1. Очищаем буфер погоды
+  weatherCanvas->fillScreen(BLACK);
 
-    // Clear Icon Area (Left side)
-    // x=0 to 120, y=185 to 320
-    gfx->fillRect(0, 185, 120, 135, BLACK);
+  // 2. Рисуем разделительную линию (в буфере y=0 соответствует y=180 на экране)
+  weatherCanvas->drawLine(20, 0, 220, 0, CLR_DGRAY);
 
-    int iconX = 10;
-    int iconY = 195;
+  // 3. Рисуем иконку (в буфере)
+  int iconX = 10;
+  int iconY = 15;
 
-    if (condition == "Clear") {
-      if (isNight)
-        drawMoonVolumetric(gfx, iconX, iconY);
-      else
-        drawSunVolumetric(gfx, iconX, iconY);
-    } else if (condition == "Clouds")
-      drawCloudVolumetric(gfx, iconX, iconY);
-    else if (condition == "Rain" || condition == "Drizzle")
-      drawRainVolumetric(gfx, iconX, iconY);
-    else if (condition == "Thunderstorm")
-      drawThunderVolumetric(gfx, iconX, iconY);
-    else if (condition == "Mist" || condition == "Fog" || condition == "Haze")
-      drawFogVolumetric(gfx, iconX, iconY);
-    else if (condition == "Snow")
-      drawSnowVolumetric(gfx, iconX, iconY);
+  if (condition == "Clear") {
+    if (isNight)
+      drawMoonVolumetric(weatherCanvas, iconX, iconY);
     else
-      drawCloudVolumetric(gfx, iconX, iconY);
-  }
+      drawSunVolumetric(weatherCanvas, iconX, iconY);
+  } else if (condition == "Clouds")
+    drawCloudVolumetric(weatherCanvas, iconX, iconY);
+  else if (condition == "Rain" || condition == "Drizzle")
+    drawRainVolumetric(weatherCanvas, iconX, iconY);
+  else if (condition == "Thunderstorm")
+    drawThunderVolumetric(weatherCanvas, iconX, iconY);
+  else if (condition == "Mist" || condition == "Fog" || condition == "Haze")
+    drawFogVolumetric(weatherCanvas, iconX, iconY);
+  else if (condition == "Snow")
+    drawSnowVolumetric(weatherCanvas, iconX, iconY);
+  else
+    drawCloudVolumetric(weatherCanvas, iconX, iconY);
 
-  // 2. UPDATE TEMP
-  if (tempChanged || prevTemp == -999) {
-    prevTemp = temp;
+  // 4. Рисуем температуру (в буфере)
+  weatherCanvas->setFont(&FreeSansBold24pt7b);
+  weatherCanvas->setTextSize(1);
 
-    // Clear Temp Area (Right side)
-    // x=120 to 240, y=185 to 320
-    gfx->fillRect(120, 185, 120, 135, BLACK);
+  char tempStr[10];
+  sprintf(tempStr, "%.1f", temp);
 
-    gfx->setFont(&FreeSansBold24pt7b);
-    gfx->setTextSize(1);
+  int16_t tx1, ty1;
+  uint16_t tw, th;
+  weatherCanvas->getTextBounds(tempStr, 0, 0, &tx1, &ty1, &tw, &th);
 
-    char tempStr[10];
-    sprintf(tempStr, "%.1f", temp);
+  int txPos = 240 - tw - 20;
+  int tyPos = 80;
 
-    int16_t tx1, ty1;
-    uint16_t tw, th;
-    gfx->getTextBounds(tempStr, 0, 0, &tx1, &ty1, &tw, &th);
+  // Тень
+  weatherCanvas->setTextColor(CLR_DEEP_BLUE);
+  weatherCanvas->setCursor(txPos + 2, tyPos + 2);
+  weatherCanvas->print(tempStr);
 
-    int txPos = SCREEN_WIDTH - tw - 45; // Leave space for degree symbol
-    int tyPos = 265;
+  // Основной текст
+  weatherCanvas->setTextColor(CYAN);
+  weatherCanvas->setCursor(txPos, tyPos);
+  weatherCanvas->print(tempStr);
 
-    // Shadow
-    gfx->setTextColor(CLR_DEEP_BLUE);
-    gfx->setCursor(txPos + 2, tyPos + 2);
-    gfx->print(tempStr);
+  // Символ градуса
+  int degX = txPos + tw + 8;
+  int degY = tyPos - th + 5;
+  weatherCanvas->fillCircle(degX, degY, 4, CYAN);
+  weatherCanvas->drawCircle(degX, degY, 5, WHITE);
 
-    // Main Text
-    gfx->setTextColor(CYAN);
-    gfx->setCursor(txPos, tyPos);
-    gfx->print(tempStr);
+  weatherCanvas->setFont(NULL);
 
-    // Degree Symbol
-    int degX = txPos + tw + 8;
-    int degY = tyPos - th + 5;
-    gfx->fillCircle(degX, degY, 4, CYAN);
-    gfx->drawCircle(degX, degY, 5, WHITE);
-
-    gfx->setFont(NULL);
-  }
+  // 5. Выводим буфер погоды на экран
+  weatherCanvas->flush();
 }
 
 void DisplayDriver::drawConnecting(String ssid) {

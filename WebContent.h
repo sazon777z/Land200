@@ -302,11 +302,11 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('stopSoundBtn').addEventListener('click', stopSound);
     document.getElementById('rebootBtn').addEventListener('click', rebootSystem);
     document.getElementById('ledEffect').addEventListener('change', (e) => { setLedEffect(e.target.value); });
-    document.getElementById('ledColor').addEventListener('input', (e) => { setLedColor(e.target.value); });
-    document.getElementById('ledBrightRange').addEventListener('input', (e) => { setLedBrightness(e.target.value); });
-    document.getElementById('ledSpeedRange').addEventListener('input', (e) => { setLedSpeed(e.target.value); });
-    document.getElementById('alarmVolumeRange').addEventListener('input', (e) => { setAlarmVolume(e.target.value); });
-    document.getElementById('dispBrightRange').addEventListener('input', (e) => { setDisplayBrightness(e.target.value); });
+    document.getElementById('ledColor').addEventListener('change', (e) => { setLedColor(e.target.value); });
+    document.getElementById('ledBrightRange').addEventListener('change', (e) => { setLedBrightness(e.target.value); });
+    document.getElementById('ledSpeedRange').addEventListener('change', (e) => { setLedSpeed(e.target.value); });
+    document.getElementById('alarmVolumeRange').addEventListener('change', (e) => { setAlarmVolume(e.target.value); });
+    document.getElementById('dispBrightRange').addEventListener('change', (e) => { setDisplayBrightness(e.target.value); });
     document.getElementById('turnSignal').addEventListener('change', (e) => { setTurnSignal(e.target.value); });
     document.getElementById('frontLightsBtn').addEventListener('click', toggleFront);
     document.getElementById('rearLightsBtn').addEventListener('click', toggleRear);

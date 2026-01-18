@@ -6,7 +6,8 @@
 #include <Preferences.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
-
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 class WatchNetworkManager {
 public:
@@ -18,6 +19,7 @@ public:
   int getHour();
   int getMinute();
   int getSecond();
+  int getYear();
 
   float getTemperature();
   String getWeatherCondition();
@@ -72,6 +74,10 @@ private:
   int lastTriggerMinute; // To prevent multiple triggers in one minute
 
   bool apMode;
+
+  // Мутекс для общих ресурсов (static чтобы был один на все экземпляры, если их
+  // вдруг будет больше)
+  static SemaphoreHandle_t systemMutex;
 
   void updateWeather();
   void setupAP();

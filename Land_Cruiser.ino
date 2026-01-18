@@ -18,6 +18,9 @@ TaskHandle_t TaskDisplayHandle;
 TaskHandle_t TaskNetworkHandle;
 TaskHandle_t TaskWebHandle;
 
+// Mutex for SPI Display access
+SemaphoreHandle_t displayMutex;
+
 // Button Check (Non-blocking)
 void checkButton() {
   static bool btnPressed = false;
@@ -44,21 +47,24 @@ void TaskDisplay(void *pvParameters) {
   (void)pvParameters;
   for (;;) {
     if (network.isAPMode()) {
-      // Show AP Info and QR Code
-      display.drawAPInfo(network.getApSSID(), network.getApPassword(),
-                         network.getIpAddress());
-      vTaskDelay(5000 / portTICK_PERIOD_MS); // Refresh less often
+      if (xSemaphoreTake(displayMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        display.drawAPInfo(network.getApSSID(), network.getApPassword(),
+                           network.getIpAddress());
+        xSemaphoreGive(displayMutex);
+      }
+      vTaskDelay(pdMS_TO_TICKS(5000));
     } else if (!network.isConnected()) {
-      // This state is briefly covered by initialization, but good for stability
-      vTaskDelay(1000 / portTICK_PERIOD_MS);
+      vTaskDelay(pdMS_TO_TICKS(1000));
     } else {
-      // Normal Operation
-      display.drawClock(network.getHour(), network.getMinute(),
-                        network.getSecond());
-      display.drawWeather(network.getTemperature(),
-                          network.getWeatherCondition(),
-                          network.getWeatherIcon());
-      vTaskDelay(1000 / portTICK_PERIOD_MS);
+      if (xSemaphoreTake(displayMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        display.drawClock(network.getHour(), network.getMinute(),
+                          network.getSecond());
+        display.drawWeather(network.getTemperature(),
+                            network.getWeatherCondition(),
+                            network.getWeatherIcon());
+        xSemaphoreGive(displayMutex);
+      }
+      vTaskDelay(pdMS_TO_TICKS(1000));
     }
   }
 }
@@ -67,16 +73,15 @@ void TaskNetwork(void *pvParameters) {
   (void)pvParameters;
   for (;;) {
     network.update();
+    audio.processQueue(); // Process any pending sound commands
 
-    // Check for alarm trigger
     if (network.checkAlarmTrigger()) {
       Serial.println("ALARM TRIGGERED!");
       audio.setVolume(network.getAlarmVolume());
-      audio.playTrack(network.getAlarmSoundId());
+      audio.playAlarmSound(); // Uses queue
       led.setModeAlarm();
     }
-
-    vTaskDelay(500 / portTICK_PERIOD_MS);
+    vTaskDelay(pdMS_TO_TICKS(100)); // More frequent check for queue/alarm
   }
 }
 
@@ -98,10 +103,16 @@ void setup() {
   // Initialize Button
   pinMode(PIN_BUTTON, INPUT_PULLUP);
 
+  // Initialize Mutexes
+  displayMutex = xSemaphoreCreateMutex();
+
   // Initialize Drivers
   Serial.println("Initializing Drivers...");
   led.begin();
+
+  xSemaphoreTake(displayMutex, portMAX_DELAY);
   display.begin();
+  xSemaphoreGive(displayMutex);
   audio.begin();
 
   // Show connecting status on screen

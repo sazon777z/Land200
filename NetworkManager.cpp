@@ -4,6 +4,9 @@
 #include <ESPmDNS.h>
 #include <Preferences.h>
 
+// Определение статического мьютекса
+SemaphoreHandle_t WatchNetworkManager::systemMutex = NULL;
+
 WatchNetworkManager::WatchNetworkManager()
     : timeClient(new NTPClient(ntpUDP, NTP_SERVER, GMT_OFFSET_SEC,
                                DAYLIGHT_OFFSET_SEC)),
@@ -13,6 +16,12 @@ WatchNetworkManager::WatchNetworkManager()
       alarmTriggeredToday(false), lastTriggerMinute(-1), apMode(false) {}
 
 void WatchNetworkManager::begin() {
+  if (systemMutex == NULL) {
+    systemMutex = xSemaphoreCreateMutex();
+  }
+
+  xSemaphoreTake(systemMutex, portMAX_DELAY);
+
   preferences.begin("watch-config", false);
   String ssid = preferences.getString("ssid", "");
   String pass = preferences.getString("pass", "");
@@ -27,6 +36,9 @@ void WatchNetworkManager::begin() {
   alarmSoundId = preferences.getInt("alarmSound", 1);
   alarmVolume = preferences.getInt("alarmVol", 20);
   alarmEnabled = preferences.getBool("alarmEnabled", false);
+
+  preferences.end();
+  xSemaphoreGive(systemMutex);
 
   if (ssid == "") {
     Serial.println("No saved WiFi. Starting AP.");
@@ -132,6 +144,13 @@ int WatchNetworkManager::getMinute() { return timeClient->getMinutes(); }
 
 int WatchNetworkManager::getSecond() { return timeClient->getSeconds(); }
 
+int WatchNetworkManager::getYear() {
+  time_t rawtime = timeClient->getEpochTime();
+  struct tm *ti;
+  ti = localtime(&rawtime);
+  return ti->tm_year + 1900;
+}
+
 float WatchNetworkManager::getTemperature() { return currentTemp; }
 
 String WatchNetworkManager::getWeatherCondition() { return currentCondition; }
@@ -157,10 +176,12 @@ String WatchNetworkManager::getIpAddress() {
 }
 
 void WatchNetworkManager::saveWiFiCredentials(String ssid, String pass) {
+  xSemaphoreTake(systemMutex, portMAX_DELAY);
   preferences.begin("watch-config", false);
   preferences.putString("ssid", ssid);
   preferences.putString("pass", pass);
   preferences.end();
+  xSemaphoreGive(systemMutex);
   Serial.println("Credentials saved. Please reboot.");
 }
 
@@ -168,10 +189,13 @@ void WatchNetworkManager::saveLocalizationSettings(int timezoneOffset,
                                                    String city) {
   timeOffset = timezoneOffset;
   weatherCity = city;
+
+  xSemaphoreTake(systemMutex, portMAX_DELAY);
   preferences.begin("watch-config", false);
   preferences.putInt("timeOffset", timezoneOffset);
   preferences.putString("city", city);
   preferences.end();
+  xSemaphoreGive(systemMutex);
 
   // Update NTP client and Weather if connected
   if (!apMode && WiFi.status() == WL_CONNECTED) {
@@ -189,12 +213,14 @@ void WatchNetworkManager::saveAlarm(int hour, int minute, int soundId,
   alarmSoundId = soundId;
   alarmEnabled = enabled;
 
+  xSemaphoreTake(systemMutex, portMAX_DELAY);
   preferences.begin("watch-config", false);
   preferences.putInt("alarmHour", hour);
   preferences.putInt("alarmMinute", minute);
   preferences.putInt("alarmSound", soundId);
   preferences.putBool("alarmEnabled", enabled);
   preferences.end();
+  xSemaphoreGive(systemMutex);
 
   Serial.printf("Alarm saved: %02d:%02d, Sound: %d, Enabled: %d\n", hour,
                 minute, soundId, enabled);
@@ -202,9 +228,11 @@ void WatchNetworkManager::saveAlarm(int hour, int minute, int soundId,
 
 void WatchNetworkManager::saveAlarmVolume(int volume) {
   alarmVolume = volume;
+  xSemaphoreTake(systemMutex, portMAX_DELAY);
   preferences.begin("watch-config", false);
   preferences.putInt("alarmVol", volume);
   preferences.end();
+  xSemaphoreGive(systemMutex);
   Serial.printf("Alarm volume saved: %d\n", volume);
 }
 

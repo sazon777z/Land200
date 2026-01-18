@@ -2,85 +2,116 @@
 #include <Arduino.h>
 #include <HardwareSerial.h>
 
-
-// Use HardwareSerial 1 for ESP32-C3 if available or remap 0
-// For C3 SuperMini, explicit assignment is often best
+// Use HardwareSerial 1 for ESP32-C3
 HardwareSerial mySerial(1);
 
 AudioDriver::AudioDriver() {}
 
 void AudioDriver::begin() {
-  // Initialize Serial for DFPlayer
   Serial.println("Audio: Initializing DFPlayer...");
+
+  // Инициализация Serial
   mySerial.begin(9600, SERIAL_8N1, PIN_AUDIO_RX, PIN_AUDIO_TX);
 
-  // Give clones more time to wake up
-  delay(1000);
+  // Даем время на стабилизацию питания модуля
+  delay(1500);
 
-  bool connected = false;
-  for (int i = 0; i < 3; i++) {
-    Serial.print("Audio: Attempt ");
-    Serial.print(i + 1);
-    Serial.println("...");
-    // For MP3-TF-16P-V3 and similar clones:
-    // Some require reset (true), some ACK (true).
-    // Default is ACK=true, Reset=true. Let's try default but with better
-    // logging.
-    if (myDFPlayer.begin(mySerial)) {
-      connected = true;
-      break;
-    }
-    delay(500);
-  }
-
-  if (!connected) {
-    Serial.println("Audio Error: DFPlayer NOT found! Check pins/card.");
+  // Используем (mySerial, false, false) - отключаем ACK и Reset
+  // Это самый надежный способ для клонов, которые зависают при инициализации
+  if (!myDFPlayer.begin(mySerial, false, false)) {
+    Serial.println(
+        "Audio Warning: DFPlayer begin returned false. Wiring/SD issue?");
+    // Мы все равно разрешаем работу, так как команды могут уходить "вслепую"
   } else {
-    Serial.println("Audio: DFPlayer Online.");
-    myDFPlayer.volume(20);
-    lastVolume = 20;
+    Serial.println("Audio: DFPlayer initialized.");
   }
+
+  isReady = true;
+  myDFPlayer.volume(25);
+  lastVolume = 25;
+
+  // Создание очереди команд
+  audioQueue = xQueueCreate(20, sizeof(AudioCommand));
 }
 
 void AudioDriver::playTrack(int trackNumber) {
+  if (audioQueue == NULL)
+    return;
+  AudioCommand cmd = {CMD_PLAY, trackNumber};
+  xQueueSend(audioQueue, &cmd, 0);
+}
+
+void AudioDriver::stop() {
+  if (audioQueue == NULL)
+    return;
+  AudioCommand cmd = {CMD_STOP, 0};
+  xQueueSend(audioQueue, &cmd, 0);
+}
+
+void AudioDriver::setVolume(uint8_t volume) {
+  if (audioQueue == NULL)
+    return;
+  AudioCommand cmd = {CMD_SET_VOLUME, (int)volume};
+  xQueueSend(audioQueue, &cmd, 0);
+}
+
+void AudioDriver::playAlarmSound() {
+  if (audioQueue == NULL)
+    return;
+  AudioCommand cmd = {CMD_PLAY_ALARM, 0};
+  xQueueSend(audioQueue, &cmd, 0);
+}
+
+void AudioDriver::processQueue() {
+  if (audioQueue == NULL || !isReady)
+    return;
+
+  AudioCommand cmd;
+  if (xQueueReceive(audioQueue, &cmd, pdMS_TO_TICKS(10)) == pdPASS) {
+    Serial.printf("Audio: Command (Type: %d, Data: %d)\n", cmd.type, cmd.data);
+    switch (cmd.type) {
+    case CMD_PLAY:
+      executePlay(cmd.data);
+      break;
+    case CMD_STOP:
+      executeStop();
+      break;
+    case CMD_SET_VOLUME:
+      executeVolume(cmd.data);
+      break;
+    case CMD_PLAY_ALARM:
+      executePlay(1);
+      break;
+    }
+  }
+}
+
+void AudioDriver::executePlay(int trackNumber) {
   if (trackNumber < 1)
     trackNumber = 1;
   if (trackNumber > 7)
     trackNumber = 7;
 
-  Serial.print("Audio: Playing track ");
-  Serial.println(trackNumber);
-
-  // Clear any pending serial data
-  while (mySerial.available())
-    mySerial.read();
-
-  // Using playFolder(1, trackNumber) for folder "01" as requested
+  Serial.printf("Audio: playFolder(1, %d)\n", trackNumber);
   myDFPlayer.playFolder(1, trackNumber);
-  delay(150); // Give time for the command to be processed
+  delay(150);
 }
 
-void AudioDriver::stop() {
+void AudioDriver::executeStop() {
+  Serial.println("Audio: stop()");
   myDFPlayer.stop();
   delay(100);
-  myDFPlayer.stop(); // Send twice for reliability with clones
 }
 
-void AudioDriver::setVolume(uint8_t volume) {
+void AudioDriver::executeVolume(int volume) {
   if (volume > 30)
     volume = 30;
-
-  // Cache volume to prevent constant spamming of commands
-  if (volume == lastVolume)
-    return;
-  lastVolume = volume;
-
-  Serial.print("Audio: Set volume to ");
-  Serial.println(volume);
+  Serial.printf("Audio: volume(%d)\n", volume);
   myDFPlayer.volume(volume);
-  delay(100); // Wait for module to process volume change
+  lastVolume = volume;
+  delay(100);
 }
 
-void AudioDriver::playAlarmSound() {
-  playTrack(1); // Use the stabilized playTrack method
+void AudioDriver::printDetail(uint8_t type, int value) {
+  // Not used but kept for interface consistency
 }

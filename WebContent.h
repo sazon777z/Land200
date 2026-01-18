@@ -23,7 +23,7 @@ const char index_html[] PROGMEM = R"rawliteral(
 
         <main>
             <nav class="tabs-nav">
-                <button class="tab-btn active" onclick="switchTab('main')">Главное</button>
+                <button class="tab-btn active" onclick="switchTab('main')">Главная</button>
                 <button class="tab-btn" onclick="switchTab('settings')">Настройки</button>
                 <button class="tab-btn" onclick="switchTab('effects')">Подсветка</button>
             </nav>
@@ -139,6 +139,14 @@ const char index_html[] PROGMEM = R"rawliteral(
                             <option value="Atyrau">Атырау</option>
                             <option value="Petropavl">Петропавловск</option>
                             <option value="Rudny">Рудный</option>
+                            <option value="Yekaterinburg">Екатеринбург</option>
+                            <option value="Chelyabinsk">Челябинск</option>
+                            <option value="Tyumen">Тюмень</option>
+                            <option value="Omsk">Омск</option>
+                            <option value="Moscow">Москва</option>
+                            <option value="Saint Petersburg">Санкт-Петербург</option>
+                            <option value="Novosibirsk">Новосибирск</option>
+                            <option value="Sochi">Сочи</option>
                         </select>
                     </div>
                     <button class="btn btn-primary" id="saveLocBtn">Сохранить локализацию</button>
@@ -554,7 +562,11 @@ function translateCity(c) {
         'Karaganda':'Караганда','Taraz':'Тараз','Pavlodar':'Павлодар',
         'Ust-Kamenogorsk':'Усть-Каменогорск','Semey':'Семей','Aktau':'Актау',
         'Kostanay':'Костанай','Kyzylorda':'Кызылорда','Atyrau':'Атырау',
-        'Petropavl':'Петропавловск','Rudny':'Рудный'
+        'Petropavl':'Петропавловск','Rudny':'Рудный',
+        'Yekaterinburg':'Екатеринбург','Chelyabinsk':'Челябинск',
+        'Tyumen':'Тюмень','Omsk':'Омск','Moscow':'Москва',
+        'Saint Petersburg':'Санкт-Петербург','Novosibirsk':'Новосибирск',
+        'Sochi':'Сочи'
     };
     return t[c] || c;
 }

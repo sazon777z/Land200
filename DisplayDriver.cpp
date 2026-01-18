@@ -78,6 +78,8 @@ void DisplayDriver::drawBackground() {
   gfx->fillScreen(BLACK);
 }
 
+void DisplayDriver::clearMainSegments() { gfx->fillScreen(BLACK); }
+
 void DisplayDriver::drawClock(int hour, int minute, int second) {
   // Мигание двоеточия каждую секунду
   bool needRefresh =
@@ -147,30 +149,28 @@ void DisplayDriver::drawWeather(float temp, String condition, String icon) {
   // 1. Очищаем буфер погоды
   weatherCanvas->fillScreen(BLACK);
 
-  // 2. Рисуем разделительную линию (в буфере y=0 соответствует y=180 на экране)
-  weatherCanvas->drawLine(20, 0, 220, 0, CLR_DGRAY);
-
   // 3. Рисуем иконку (в буфере)
   int iconX = 10;
   int iconY = 15;
 
   if (condition == "Clear") {
     if (isNight)
-      drawMoonVolumetric(weatherCanvas, iconX, iconY);
+      drawWeatherIconChunk(weatherCanvas, iconX, iconY, IC_CLEAR_NIGHT);
     else
-      drawSunVolumetric(weatherCanvas, iconX, iconY);
+      drawWeatherIconChunk(weatherCanvas, iconX, iconY, IC_CLEAR_DAY);
   } else if (condition == "Clouds")
-    drawCloudVolumetric(weatherCanvas, iconX, iconY);
+    drawWeatherIconChunk(weatherCanvas, iconX, iconY, IC_CLOUDY);
   else if (condition == "Rain" || condition == "Drizzle")
-    drawRainVolumetric(weatherCanvas, iconX, iconY);
+    drawWeatherIconChunk(weatherCanvas, iconX, iconY, IC_RAIN);
   else if (condition == "Thunderstorm")
-    drawThunderVolumetric(weatherCanvas, iconX, iconY);
+    drawWeatherIconChunk(weatherCanvas, iconX, iconY, IC_THUNDER);
   else if (condition == "Mist" || condition == "Fog" || condition == "Haze")
-    drawFogVolumetric(weatherCanvas, iconX, iconY);
+    drawWeatherIconChunk(weatherCanvas, iconX, iconY, IC_FOG);
   else if (condition == "Snow")
-    drawSnowVolumetric(weatherCanvas, iconX, iconY);
+    drawWeatherIconChunk(weatherCanvas, iconX, iconY,
+                         IC_CLOUDY); // No snow icon in current set
   else
-    drawCloudVolumetric(weatherCanvas, iconX, iconY);
+    drawWeatherIconChunk(weatherCanvas, iconX, iconY, IC_CLOUDY);
 
   // 4. Рисуем температуру (в буфере)
   weatherCanvas->setFont(&FreeSansBold24pt7b);
@@ -186,11 +186,6 @@ void DisplayDriver::drawWeather(float temp, String condition, String icon) {
   int txPos = 240 - tw - 20;
   int tyPos = 80;
 
-  // Тень
-  weatherCanvas->setTextColor(CLR_DEEP_BLUE);
-  weatherCanvas->setCursor(txPos + 2, tyPos + 2);
-  weatherCanvas->print(tempStr);
-
   // Основной текст
   weatherCanvas->setTextColor(CYAN);
   weatherCanvas->setCursor(txPos, tyPos);
@@ -199,8 +194,7 @@ void DisplayDriver::drawWeather(float temp, String condition, String icon) {
   // Символ градуса
   int degX = txPos + tw + 8;
   int degY = tyPos - th + 5;
-  weatherCanvas->fillCircle(degX, degY, 4, CYAN);
-  weatherCanvas->drawCircle(degX, degY, 5, WHITE);
+  weatherCanvas->drawCircle(degX, degY, 4, CYAN);
 
   weatherCanvas->setFont(NULL);
 
@@ -211,19 +205,17 @@ void DisplayDriver::drawWeather(float temp, String condition, String icon) {
 void DisplayDriver::drawConnecting(String ssid) {
   gfx->fillScreen(BLACK);
   gfx->setTextColor(WHITE);
-  gfx->setTextSize(2);
+  gfx->setFont(&FreeSans9pt7b);
 
-  gfx->setCursor(20, 100);
-  gfx->print("Connecting...");
+  String msg = "Connecting...";
+  int16_t x1, y1;
+  uint16_t w, h;
+  gfx->getTextBounds(msg.c_str(), 0, 0, &x1, &y1, &w, &h);
 
-  gfx->setTextSize(1);
-  gfx->setCursor(20, 140);
-  gfx->print("SSID: ");
-  gfx->print(ssid);
+  gfx->setCursor((240 - w) / 2, 160);
+  gfx->print(msg);
 
-  gfx->setCursor(20, 170);
-  gfx->setTextColor(CYAN);
-  gfx->print("Please wait up to 20s");
+  gfx->setFont(NULL);
 }
 
 // Function to draw QR Code

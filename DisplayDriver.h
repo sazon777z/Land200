@@ -27,6 +27,7 @@ public:
   void drawQRCode(String data, int startX, int startY, int scale);
   void drawAPInfo(String ssid, String pass, String ip);
   void setBrightness(uint8_t brightness);
+  void clearMainSegments(); // Очистка экрана после загрузки
 
 private:
   Arduino_DataBus *bus;

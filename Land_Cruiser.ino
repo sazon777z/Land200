@@ -56,7 +56,12 @@ void TaskDisplay(void *pvParameters) {
     } else if (!network.isConnected()) {
       vTaskDelay(pdMS_TO_TICKS(1000));
     } else {
+      static bool firstRun = true;
       if (xSemaphoreTake(displayMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        if (firstRun) {
+          display.clearMainSegments();
+          firstRun = false;
+        }
         display.drawClock(network.getHour(), network.getMinute(),
                           network.getSecond());
         display.drawWeather(network.getTemperature(),

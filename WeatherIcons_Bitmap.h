@@ -40,28 +40,7 @@ void drawWeatherIconChunk(Arduino_GFX *gfx, int16_t x, int16_t y,
   }
 }
 
-// Старые функции-заглушки для совместимости (можно убрать после обновления
-// DisplayDriver)
-void drawSunVolumetric(Arduino_GFX *gfx, int x, int y) {
-  drawWeatherIconChunk(gfx, x, y, IC_CLEAR_DAY);
-}
-void drawCloudVolumetric(Arduino_GFX *gfx, int x, int y) {
-  drawWeatherIconChunk(gfx, x, y, IC_CLOUDY);
-}
-void drawMoonVolumetric(Arduino_GFX *gfx, int x, int y) {
-  drawWeatherIconChunk(gfx, x, y, IC_CLEAR_NIGHT);
-}
-void drawRainVolumetric(Arduino_GFX *gfx, int x, int y) {
-  drawWeatherIconChunk(gfx, x, y, IC_RAIN);
-}
-void drawSnowVolumetric(Arduino_GFX *gfx, int x, int y) {
-  drawWeatherIconChunk(gfx, x, y, IC_CLOUDY);
-}
-void drawFogVolumetric(Arduino_GFX *gfx, int x, int y) {
-  drawWeatherIconChunk(gfx, x, y, IC_FOG);
-}
-void drawThunderVolumetric(Arduino_GFX *gfx, int x, int y) {
-  drawWeatherIconChunk(gfx, x, y, IC_THUNDER);
-}
+// Note: drawSunVolumetric and other compatibility stubs were removed.
+// DisplayDriver now uses drawWeatherIconChunk directly or via updated logic.
 
 #endif

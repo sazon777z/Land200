@@ -8,7 +8,7 @@
 #include "FreeSans9pt7b.h"      // Новый уменьшенный шрифт для AP Info
 #include "FreeSansBold18pt7b.h" // Для масштабирования x2 (~72px)
 #include "FreeSansBold24pt7b.h"
-#include "WeatherIcons_Bitmap.h" // Наши новые ОБЪЕМНЫЕ иконки погоды
+#include "WeatherIcons_120.h"
 
 // Определение массива указателей на цифры (было перенесено из Digits_Data.h для
 // устранения multiple definition)
@@ -149,52 +149,89 @@ void DisplayDriver::drawWeather(float temp, String condition, String icon) {
   // 1. Очищаем буфер погоды
   weatherCanvas->fillScreen(BLACK);
 
-  // 3. Рисуем иконку (в буфере)
-  int iconX = 10;
-  int iconY = 15;
+  // Центрирование по вертикали для иконки высотой 150 в канвасе 135?
+  // Канвас высотой 135 (DisplayDriver.cpp L42: weatherCanvas = new
+  // Arduino_Canvas(240, 135, gfx, 0, 180);) Иконка 150x150 не влезает по высоте
+  // в 135 пикселей. Нам нужно либо увеличить канвас, либо уменьшить иконку,
+  // либо обрезать. Так как ТЗ строго 150x150, предположим, что мы сдвинем
+  // канвас или увеличим его. Но экран всего 320x240 (или 240x320?).
+  // Инициализация: Arduino_ILI9341(bus, PIN_LCD_RST, 0, false). Rotation 0
+  // обычно 240x320 (Portrait). Часы занимают y=40, h=100. (40+100=140). Погода
+  // y=180. (320 - 180 = 140 пикселей доступно до низу). Значит, канвас высотой
+  // 135 вполне логичен, но 150 туда не влезет полностью. ТЕМ НЕ МЕНЕЕ, если
+  // пользователь просит 150x150, мы должны попытаться это вместить. Допустим,
+  // мы рисуем начиная с Y=0 в канвасе. Если канвас 135, то 15 пикселей
+  // обрежутся. Или пользователь изменит размер канваса. Давайте поменяем размер
+  // канваса в конструкторе позже. Пока пишем логику рисования.
+
+  const uint16_t *currentIconPtr = icon_weather_clouds_day; // Default
 
   if (condition == "Clear") {
-    if (isNight)
-      drawWeatherIconChunk(weatherCanvas, iconX, iconY, IC_CLEAR_NIGHT);
-    else
-      drawWeatherIconChunk(weatherCanvas, iconX, iconY, IC_CLEAR_DAY);
-  } else if (condition == "Clouds")
-    drawWeatherIconChunk(weatherCanvas, iconX, iconY, IC_CLOUDY);
-  else if (condition == "Rain" || condition == "Drizzle")
-    drawWeatherIconChunk(weatherCanvas, iconX, iconY, IC_RAIN);
-  else if (condition == "Thunderstorm")
-    drawWeatherIconChunk(weatherCanvas, iconX, iconY, IC_THUNDER);
-  else if (condition == "Mist" || condition == "Fog" || condition == "Haze")
-    drawWeatherIconChunk(weatherCanvas, iconX, iconY, IC_FOG);
-  else if (condition == "Snow")
-    drawWeatherIconChunk(weatherCanvas, iconX, iconY,
-                         IC_CLOUDY); // No snow icon in current set
-  else
-    drawWeatherIconChunk(weatherCanvas, iconX, iconY, IC_CLOUDY);
+    currentIconPtr =
+        isNight ? icon_weather_clear_night : icon_weather_clear_day;
+  } else if (condition == "Clouds") {
+    // OpenWeatherMap: 801-804.
+    // 801 (few clouds), 802 (scattered) might be "clouds_day/night"
+    // 803, 804 (broken, overcast) might be "overcast"
+    // Упростим логику: если просто Clouds, используем overcast или clouds_day
+    currentIconPtr =
+        isNight ? icon_weather_clouds_night : icon_weather_clouds_day;
+  } else if (condition == "Overcast") { // Specific check if available
+    currentIconPtr = icon_weather_overcast;
+  } else if (condition == "Rain" || condition == "Drizzle" ||
+             condition == "Shower Rain") {
+    currentIconPtr = icon_weather_rain;
+  } else if (condition == "Thunderstorm") {
+    currentIconPtr = icon_weather_thunder;
+  } else if (condition == "Snow") {
+    currentIconPtr = icon_weather_snow;
+  } else if (condition == "Mist" || condition == "Fog" || condition == "Haze") {
+    currentIconPtr = icon_weather_mist;
+  } else {
+    currentIconPtr = icon_weather_overcast;
+  }
 
-  // 4. Рисуем температуру (в буфере)
+  // Координаты: Иконка слева внизу.
+  // В канвасе (0,0) - это левый верхний угол канваса.
+  // Иконка 150px шириной.
+  // Температура справа.
+
+  // Рисуем иконку
+  // Используем draw16bitRGBBitmap так как иконки в PROGMEM
+  // x=0, y= -15 (чтобы центрировать по вертикали, если канвас меньше иконки?
+  // Или просто 0, пусть обрезается с низу/верху?
+  // Канвас 135px. Иконка 150px. Разница 15px.
+  // Сдвинем вверх на -7? Нет, Canvas не умеет рисовать в минус.
+  // Просто рисуем в 0,0, низ обрежется. Или переопределим канвас.
+  weatherCanvas->draw16bitRGBBitmap(0, 7, (uint16_t *)currentIconPtr, 120, 120);
+
+  // Рисуем температуру справа
   weatherCanvas->setFont(&FreeSansBold24pt7b);
   weatherCanvas->setTextSize(1);
+  weatherCanvas->setTextColor(WHITE);
 
   char tempStr[10];
-  sprintf(tempStr, "%.1f", temp);
+  sprintf(tempStr, "%.0f", temp); // Без дробной части для эстетики или %.1f
 
   int16_t tx1, ty1;
   uint16_t tw, th;
   weatherCanvas->getTextBounds(tempStr, 0, 0, &tx1, &ty1, &tw, &th);
 
-  int txPos = 240 - tw - 20;
-  int tyPos = 80;
+  // Позиция X: Справа от иконки (120) + отступ (5) + сдвиг пользователя (20)
+  int textX = 120 + 5 + 20;
 
-  // Основной текст
-  weatherCanvas->setTextColor(CYAN);
-  weatherCanvas->setCursor(txPos, tyPos);
+  // Позиция Y: Центр канваса + сдвиг пользователя вверх (-10)
+  int textY = (135 / 2) + (th / 2) - 10;
+
+  weatherCanvas->setCursor(textX, textY);
   weatherCanvas->print(tempStr);
 
-  // Символ градуса
-  int degX = txPos + tw + 8;
-  int degY = tyPos - th + 5;
-  weatherCanvas->drawCircle(degX, degY, 4, CYAN);
+  // Символ градуса (белый, жирный, с увеличенным отступом)
+  int degreeX = textX + tw + 10; // Отступ от цифр увеличен до 10
+  int degreeY = textY - th + 5;  // Позиция по высоте
+  weatherCanvas->drawCircle(degreeX, degreeY, 4, WHITE); // Основной круг
+  weatherCanvas->drawCircle(degreeX, degreeY, 5,
+                            WHITE); // Второй круг для толщины
 
   weatherCanvas->setFont(NULL);
 

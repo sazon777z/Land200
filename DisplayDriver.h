@@ -4,8 +4,10 @@
 #include "Digits_Data.h"
 #include "FreeSans12pt7b.h"
 #include "FreeSansBold18pt7b.h"
+#include "RusFont.h"
 #include "config.h"
 #include <Arduino_GFX_Library.h>
+
 
 // Color Definitions (16-bit RGB565)
 #define BLACK 0x0000
@@ -22,7 +24,7 @@ public:
   DisplayDriver();
   void begin();
   void drawClock(int hour, int minute, int second);
-  void drawWeather(float temp, String condition, String icon);
+  void drawWeather(float temp, String condition);
   void drawConnecting(String ssid);
   void drawQRCode(String data, int startX, int startY, int scale);
   void drawAPInfo(String ssid, String pass, String ip);

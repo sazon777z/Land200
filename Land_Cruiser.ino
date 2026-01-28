@@ -65,8 +65,7 @@ void TaskDisplay(void *pvParameters) {
         display.drawClock(network.getHour(), network.getMinute(),
                           network.getSecond());
         display.drawWeather(network.getTemperature(),
-                            network.getWeatherCondition(),
-                            network.getWeatherIcon());
+                            network.getWeatherCondition());
         xSemaphoreGive(displayMutex);
       }
       vTaskDelay(pdMS_TO_TICKS(1000));

@@ -17,9 +17,9 @@
 // =========================================================================
 
 // Укажите здесь реальные размеры ваших цифр!
-#define DIGIT_WIDTH 45
-#define DIGIT_HEIGHT 80
-#define COLON_WIDTH 20
+#define DIGIT_WIDTH 35
+#define DIGIT_HEIGHT 70
+#define COLON_WIDTH 10
 
 // Массив цифры 0
 const uint16_t

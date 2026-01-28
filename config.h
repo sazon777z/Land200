@@ -3,13 +3,14 @@
 
 // --- Hardware Pin Definitions (ESP32-C3 Super Mini) ---
 
-// Display (ILI9341 - 2.4" TFT SPI)
+// Display (TZT 1.47" ST7789 172x320 IPS)
+// Pinout: SDA->7, SCL->6, DC->5, RES->8, CS->4, BLK->10
 #define PIN_LCD_SCK 6
 #define PIN_LCD_MOSI 7
 #define PIN_LCD_CS 4
 #define PIN_LCD_DC 5
 #define PIN_LCD_RST 8
-#define PIN_LCD_BL 10 // PWM for backlight brightness
+#define PIN_LCD_BL 10
 
 // Audio (DFPlayer Mini)
 // Note: ESP32-C3 has limited UARTs. TX/RX might need remapping if
@@ -40,7 +41,7 @@
 #define WEATHER_UPDATE_INTERVAL_MS 600000 // 10 minutes for better accuracy
 
 // --- Display Settings ---
-#define SCREEN_WIDTH 240
+#define SCREEN_WIDTH 172
 #define SCREEN_HEIGHT 320
 
 #endif // CONFIG_H

@@ -76,8 +76,8 @@ void WatchNetworkManager::begin() {
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
 
-    if (MDNS.begin("artemLandCruiser")) {
-      Serial.println("mDNS responder started: http://artemLandCruiser.local");
+    if (MDNS.begin("lc200")) {
+      Serial.println("mDNS responder started: http://lc200.local");
       MDNS.addService("http", "tcp", 80);
     }
 
@@ -108,8 +108,8 @@ void WatchNetworkManager::setupAP() {
     WiFi.softAP(apSSID.c_str());
   }
 
-  if (MDNS.begin("artemLandCruiser")) {
-    Serial.println("mDNS responder started: http://artemLandCruiser.local");
+  if (MDNS.begin("lc200")) {
+    Serial.println("mDNS responder started: http://lc200.local");
     MDNS.addService("http", "tcp", 80);
   }
 
@@ -307,7 +307,7 @@ void WatchNetworkManager::updateWeather() {
     if (!error) {
       if (doc.containsKey("main")) {
         currentTemp = doc["main"]["temp"].as<float>();
-        const char *desc = doc["weather"][0]["main"];
+        const char *desc = doc["weather"][0]["description"];
         currentCondition = String(desc);
         const char *icon = doc["weather"][0]["icon"];
         currentIcon = String(icon);

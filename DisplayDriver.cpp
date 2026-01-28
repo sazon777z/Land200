@@ -4,7 +4,8 @@
 #include <Arduino_GFX_Library.h>
 
 // Шрифты
-#include "Digits_Data.h"
+// Шрифты
+#include "ClockFont.h"          // Векторные цифры
 #include "FreeSans9pt7b.h"      // Для мелкого текста
 #include "FreeSansBold18pt7b.h" // Для крупной температуры
 #include "FreeSansBold24pt7b.h" // Для очень крупной температуры (опционально)
@@ -12,10 +13,7 @@
 // Пользовательский шрифт для русского
 #include "RusFont.h"
 
-// Определение массива указателей на цифры
-const uint16_t *digits_all[] = {digit_0, digit_1, digit_2, digit_3, digit_4,
-                                digit_5, digit_6, digit_7, digit_8, digit_9};
-
+// Переменные состояния
 static int prevHour = -1;
 static int prevMinute = -1;
 static int prevSecond = -1;
@@ -124,55 +122,36 @@ void DisplayDriver::drawClock(int hour, int minute, int second) {
   clockCanvas->fillScreen(BLACK);
 
   // Центрирование часов
-  // Ширина: 4 цифры + двоеточие + отступы
-  // DIGIT_WIDTH и PROGMEM массивы должны быть обновлены пользователем!
-  // Сейчас предполагаем DIGIT_WIDTH 35
-  int gap = 4;
-  int totalWidth = (4 * DIGIT_WIDTH) + COLON_WIDTH + (4 * gap);
-  int startX = (320 - totalWidth) / 2;
-  // Вертикально центрируем в канвасе высотой 80
-  int yPos = (80 - DIGIT_HEIGHT) / 2;
+  // Используем векторный шрифт
+  int h = 70; // Высота цифр (макс 80)
+  int w = ClockDigits::getWidth(h);
+  int colonW = ClockDigits::getColonWidth(h);
+  int gap = 8; // Отступ между цифрами
 
-  if (startX < 0)
-    startX = 0; // Защита
-  if (yPos < 0)
-    yPos = 0;
+  int totalWidth = (4 * w) + colonW + (4 * gap);
+  int startX = (320 - totalWidth) / 2;
+  int yPos = (80 - h) / 2;
 
   // Часы Tens
-  clockCanvas->draw16bitRGBBitmap(startX, yPos,
-                                  (uint16_t *)digits_all[hour / 10],
-                                  DIGIT_WIDTH, DIGIT_HEIGHT);
-  startX += DIGIT_WIDTH + gap;
+  ClockDigits::draw(clockCanvas, startX, yPos, h, WHITE, hour / 10);
+  startX += w + gap;
 
   // Часы Units
-  clockCanvas->draw16bitRGBBitmap(startX, yPos,
-                                  (uint16_t *)digits_all[hour % 10],
-                                  DIGIT_WIDTH, DIGIT_HEIGHT);
-  startX += DIGIT_WIDTH + gap;
+  ClockDigits::draw(clockCanvas, startX, yPos, h, WHITE, hour % 10);
+  startX += w + gap;
 
   // Двоеточие
   if (colonVisible) {
-    // Ипользуем digit_colon, надо убедиться что он есть в Digits_Data.h (там
-    // обычно просто digit_colon) В Digits_Data.h нет digit_colon, но инструкция
-    // говорит "цифры 0-9 и двоеточие". Обычно используется 11-й элемент или
-    // отдельный массив. В текущем Digits_Data.h (исходном) я не вижу
-    // digit_colon. Я добавлю пустышку-квадрат если нет массива, но предполагаю
-    // что пользователь добавит. Пока нарисуем просто прямоугольники
-    clockCanvas->fillRect(startX, yPos + 20, COLON_WIDTH, 10, WHITE);
-    clockCanvas->fillRect(startX, yPos + 50, COLON_WIDTH, 10, WHITE);
+    ClockDigits::drawColon(clockCanvas, startX, yPos, h, WHITE);
   }
-  startX += COLON_WIDTH + gap;
+  startX += colonW + gap;
 
   // Минуты Tens
-  clockCanvas->draw16bitRGBBitmap(startX, yPos,
-                                  (uint16_t *)digits_all[minute / 10],
-                                  DIGIT_WIDTH, DIGIT_HEIGHT);
-  startX += DIGIT_WIDTH + gap;
+  ClockDigits::draw(clockCanvas, startX, yPos, h, WHITE, minute / 10);
+  startX += w + gap;
 
   // Минуты Units
-  clockCanvas->draw16bitRGBBitmap(startX, yPos,
-                                  (uint16_t *)digits_all[minute % 10],
-                                  DIGIT_WIDTH, DIGIT_HEIGHT);
+  ClockDigits::draw(clockCanvas, startX, yPos, h, WHITE, minute % 10);
 
   clockCanvas->flush();
 }

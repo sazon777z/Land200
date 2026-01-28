@@ -21,7 +21,20 @@
 
 // LEDs
 #define PIN_WS2812 2 // Addressable LED Strip (DIN)
-#define NUM_LEDS 8   // Number of WS2812B LEDs (4 underglow + 4 vehicle)
+#define NUM_LEDS 12  // Total LEDs: 8 Underglow + 2 Tail + 2 Head
+
+// LED Ranges
+#define LED_UNDERGLOW_START 0
+#define LED_UNDERGLOW_COUNT 8
+#define LED_UNDERGLOW_END (LED_UNDERGLOW_START + LED_UNDERGLOW_COUNT - 1)
+
+#define LED_TAIL_START 8
+#define LED_TAIL_COUNT 2
+#define LED_TAIL_END (LED_TAIL_START + LED_TAIL_COUNT - 1)
+
+#define LED_HEAD_START 10
+#define LED_HEAD_COUNT 2
+#define LED_HEAD_END (LED_HEAD_START + LED_HEAD_COUNT - 1)
 
 // Button
 #define PIN_BUTTON 3 // Input Pullup

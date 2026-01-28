@@ -1,13 +1,11 @@
 #ifndef DISPLAY_DRIVER_H
 #define DISPLAY_DRIVER_H
 
-#include "Digits_Data.h"
 #include "FreeSans12pt7b.h"
 #include "FreeSansBold18pt7b.h"
 #include "RusFont.h"
 #include "config.h"
 #include <Arduino_GFX_Library.h>
-
 
 // Color Definitions (16-bit RGB565)
 #define BLACK 0x0000

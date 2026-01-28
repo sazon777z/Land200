@@ -21,14 +21,14 @@ void LedDriver::update() {
   if (!alarmState) {
     switch (currentEffect) {
     case OFF:
-      for (int i = 0; i < 4; i++)
+      for (int i = LED_UNDERGLOW_START; i <= LED_UNDERGLOW_END; i++)
         strip.setPixelColor(i, 0);
       break;
     case RAINBOW:
       rainbowEffect();
       break;
     case SOLID:
-      for (int i = 0; i < 4; i++)
+      for (int i = LED_UNDERGLOW_START; i <= LED_UNDERGLOW_END; i++)
         strip.setPixelColor(i, solidColor);
       break;
     case BREATH:
@@ -62,11 +62,11 @@ void LedDriver::update() {
     uint32_t frontColor = headlightsOn ? strip.Color(255, 255, 255) : 0;
     uint32_t rearColor = taillightsOn ? strip.Color(255, 0, 0) : 0;
 
-    // Apply base colors: 4-5 front, 6-7 rear
-    strip.setPixelColor(4, frontColor);
-    strip.setPixelColor(5, frontColor);
-    strip.setPixelColor(6, rearColor);
-    strip.setPixelColor(7, rearColor);
+    // Apply base colors: 10-11 front, 8-9 rear
+    for (int i = LED_HEAD_START; i <= LED_HEAD_END; i++)
+      strip.setPixelColor(i, frontColor);
+    for (int i = LED_TAIL_START; i <= LED_TAIL_END; i++)
+      strip.setPixelColor(i, rearColor);
 
     // Turn Signal Logic (Smooth fading amber)
     if (turnSignalMode != TS_OFF) {
@@ -87,16 +87,14 @@ void LedDriver::update() {
         uint32_t amber =
             strip.Color((255 * amberBright) / 255, (45 * amberBright) / 255, 0);
         if (turnSignalMode == TS_LEFT) {
-          strip.setPixelColor(4, amber);
-          strip.setPixelColor(6, amber); // Front-left and Rear-left
+          strip.setPixelColor(10, amber); // Front Left
+          strip.setPixelColor(8, amber);  // Rear Left
         } else if (turnSignalMode == TS_RIGHT) {
-          strip.setPixelColor(5, amber);
-          strip.setPixelColor(7, amber); // Front-right and Rear-right
+          strip.setPixelColor(11, amber); // Front Right
+          strip.setPixelColor(9, amber);  // Rear Right
         } else if (turnSignalMode == TS_HAZARD) {
-          strip.setPixelColor(4, amber);
-          strip.setPixelColor(5, amber);
-          strip.setPixelColor(6, amber);
-          strip.setPixelColor(7, amber);
+          for (int i = LED_TAIL_START; i <= LED_HEAD_END; i++)
+            strip.setPixelColor(i, amber);
         }
       }
     }
@@ -138,7 +136,7 @@ void LedDriver::setModeAlarm(AlarmCarEffect carEff, LedEffect ledEff) {
 }
 
 void LedDriver::rainbowEffect() {
-  for (int i = 0; i < 4; i++) {
+  for (int i = LED_UNDERGLOW_START; i <= LED_UNDERGLOW_END; i++) {
     int pixelHue = (animationStep + (i * 65536L / 4));
     strip.setPixelColor(i, strip.gamma32(strip.ColorHSV(pixelHue)));
   }
@@ -152,16 +150,18 @@ void LedDriver::policeEffect() {
   if (phase > 10)
     phase = 0;
 
+  int mid = LED_UNDERGLOW_COUNT / 2;
+
   if (phase < 5) {
-    strip.setPixelColor(0, 255, 0, 0);
-    strip.setPixelColor(1, 255, 0, 0);
-    strip.setPixelColor(2, 0, 0, 255);
-    strip.setPixelColor(3, 0, 0, 255);
+    for (int i = 0; i < mid; i++)
+      strip.setPixelColor(LED_UNDERGLOW_START + i, 255, 0, 0);
+    for (int i = mid; i < LED_UNDERGLOW_COUNT; i++)
+      strip.setPixelColor(LED_UNDERGLOW_START + i, 0, 0, 255);
   } else {
-    strip.setPixelColor(0, 0, 0, 255);
-    strip.setPixelColor(1, 0, 0, 255);
-    strip.setPixelColor(2, 255, 0, 0);
-    strip.setPixelColor(3, 255, 0, 0);
+    for (int i = 0; i < mid; i++)
+      strip.setPixelColor(LED_UNDERGLOW_START + i, 0, 0, 255);
+    for (int i = mid; i < LED_UNDERGLOW_COUNT; i++)
+      strip.setPixelColor(LED_UNDERGLOW_START + i, 255, 0, 0);
   }
 }
 
@@ -170,7 +170,7 @@ void LedDriver::breathEffect() {
   uint8_t r = (uint8_t)((solidColor >> 16 & 0xFF) * intensity);
   uint8_t g = (uint8_t)((solidColor >> 8 & 0xFF) * intensity);
   uint8_t b = (uint8_t)((solidColor & 0xFF) * intensity);
-  for (int i = 0; i < 4; i++)
+  for (int i = LED_UNDERGLOW_START; i <= LED_UNDERGLOW_END; i++)
     strip.setPixelColor(i, strip.Color(r, g, b));
   animationStep++;
 }
@@ -179,7 +179,7 @@ void LedDriver::strobeEffect() {
   static bool on = false;
   on = !on;
   uint32_t color = on ? solidColor : 0;
-  for (int i = 0; i < 4; i++)
+  for (int i = LED_UNDERGLOW_START; i <= LED_UNDERGLOW_END; i++)
     strip.setPixelColor(i, color);
 }
 
@@ -200,15 +200,15 @@ void LedDriver::fadeEffect() {
   uint8_t r = (uint8_t)((solidColor >> 16 & 0xFF) * (val / 255.0));
   uint8_t g = (uint8_t)((solidColor >> 8 & 0xFF) * (val / 255.0));
   uint8_t b = (uint8_t)((solidColor & 0xFF) * (val / 255.0));
-  for (int i = 0; i < 4; i++)
+  for (int i = LED_UNDERGLOW_START; i <= LED_UNDERGLOW_END; i++)
     strip.setPixelColor(i, strip.Color(r, g, b));
 }
 
 void LedDriver::sparkleEffect() {
-  for (int i = 0; i < 4; i++)
+  for (int i = LED_UNDERGLOW_START; i <= LED_UNDERGLOW_END; i++)
     strip.setPixelColor(i, 0);
   if (random(10) > 7) {
-    int i = random(4);
+    int i = random(LED_UNDERGLOW_COUNT) + LED_UNDERGLOW_START;
     strip.setPixelColor(i, solidColor);
   }
 }
@@ -217,12 +217,12 @@ void LedDriver::knightRiderEffect() {
   static int pos = 0;
   static int dir = 1;
 
-  for (int i = 0; i < 4; i++)
+  for (int i = LED_UNDERGLOW_START; i <= LED_UNDERGLOW_END; i++)
     strip.setPixelColor(i, 0);
   strip.setPixelColor(pos, solidColor);
 
   pos += dir;
-  if (pos <= 0 || pos >= 3)
+  if (pos <= LED_UNDERGLOW_START || pos >= LED_UNDERGLOW_END)
     dir = -dir;
 }
 
@@ -241,29 +241,29 @@ void LedDriver::alarmEffect() {
   switch (alarmCarEff) {
   case ACE_BLINK:
     // Мигание только передних фар
-    strip.setPixelColor(4, alarmFlash ? 0xFFFFFF : 0);
-    strip.setPixelColor(5, alarmFlash ? 0xFFFFFF : 0);
-    strip.setPixelColor(6, 0);
-    strip.setPixelColor(7, 0);
+    strip.setPixelColor(10, alarmFlash ? 0xFFFFFF : 0);
+    strip.setPixelColor(11, alarmFlash ? 0xFFFFFF : 0);
+    strip.setPixelColor(8, 0);
+    strip.setPixelColor(9, 0);
     break;
   case ACE_HAZARD:
-    // Аварийка (Оранжевый на всех 4-7)
+    // Аварийка (Оранжевый на всех 8-11)
     {
       uint32_t amber = alarmFlash ? strip.Color(255, 100, 0) : 0;
-      for (int i = 4; i <= 7; i++)
+      for (int i = LED_TAIL_START; i <= LED_HEAD_END; i++)
         strip.setPixelColor(i, amber);
     }
     break;
   case ACE_POLICE:
     // Полицейское мерцание фар (перед белый, зад красный)
-    strip.setPixelColor(4, alarmFlash ? 0xFFFFFF : 0);
-    strip.setPixelColor(5, alarmFlash ? 0xFFFFFF : 0);
-    strip.setPixelColor(6, !alarmFlash ? 0xFF0000 : 0);
-    strip.setPixelColor(7, !alarmFlash ? 0xFF0000 : 0);
+    strip.setPixelColor(10, alarmFlash ? 0xFFFFFF : 0);
+    strip.setPixelColor(11, alarmFlash ? 0xFFFFFF : 0);
+    strip.setPixelColor(8, !alarmFlash ? 0xFF0000 : 0);
+    strip.setPixelColor(9, !alarmFlash ? 0xFF0000 : 0);
     break;
   default:
     // Выкл
-    for (int i = 4; i <= 7; i++)
+    for (int i = LED_TAIL_START; i <= LED_HEAD_END; i++)
       strip.setPixelColor(i, 0);
     break;
   }
@@ -271,32 +271,34 @@ void LedDriver::alarmEffect() {
   // 2. ПОДСВЕТКА ДНИЩА (Пиксели 0-3)
   switch (alarmLedEff) {
   case RAINBOW:
-    for (int i = 0; i < 4; i++) {
-      int pixelHue = (animationStep + (i * 65536L / 4));
+    for (int i = LED_UNDERGLOW_START; i <= LED_UNDERGLOW_END; i++) {
+      int pixelHue = (animationStep + (i * 65536L / LED_UNDERGLOW_COUNT));
       strip.setPixelColor(i, strip.gamma32(strip.ColorHSV(pixelHue)));
     }
     animationStep += 256;
     break;
   case POLICE:
     if (alarmFlash) {
-      strip.setPixelColor(0, 255, 0, 0);
-      strip.setPixelColor(1, 255, 0, 0);
-      strip.setPixelColor(2, 0, 0, 255);
-      strip.setPixelColor(3, 0, 0, 255);
+      // 0-3 RED, 4-7 BLUE ? No, 0-3 first half, 4-7 second half
+      // 8 LEDs total in Underglow
+      for (int i = 0; i < 4; i++)
+        strip.setPixelColor(i, 255, 0, 0);
+      for (int i = 4; i < 8; i++)
+        strip.setPixelColor(i, 0, 0, 255);
     } else {
-      strip.setPixelColor(0, 0, 0, 255);
-      strip.setPixelColor(1, 0, 0, 255);
-      strip.setPixelColor(2, 255, 0, 0);
-      strip.setPixelColor(3, 255, 0, 0);
+      for (int i = 0; i < 4; i++)
+        strip.setPixelColor(i, 0, 0, 255);
+      for (int i = 4; i < 8; i++)
+        strip.setPixelColor(i, 255, 0, 0);
     }
     break;
   case STROME:
-    for (int i = 0; i < 4; i++) {
+    for (int i = LED_UNDERGLOW_START; i <= LED_UNDERGLOW_END; i++) {
       strip.setPixelColor(i, alarmFlash ? 0xFFFFFF : 0);
     }
     break;
   case SOLID:
-    for (int i = 0; i < 4; i++) {
+    for (int i = LED_UNDERGLOW_START; i <= LED_UNDERGLOW_END; i++) {
       strip.setPixelColor(i, solidColor);
     }
     break;
@@ -304,7 +306,7 @@ void LedDriver::alarmEffect() {
     // По умолчанию - оранжевое мерцание днища
     {
       uint32_t amber = alarmFlash ? strip.Color(255, 50, 0) : 0;
-      for (int i = 0; i < 4; i++)
+      for (int i = LED_UNDERGLOW_START; i <= LED_UNDERGLOW_END; i++)
         strip.setPixelColor(i, amber);
     }
     break;

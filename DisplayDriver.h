@@ -1,9 +1,7 @@
 #ifndef DISPLAY_DRIVER_H
 #define DISPLAY_DRIVER_H
 
-#include "FreeSans12pt7b.h"
-#include "FreeSansBold18pt7b.h"
-#include "RusFont.h"
+#include "NetworkManager.h"
 #include "config.h"
 #include <Arduino_GFX_Library.h>
 
@@ -21,22 +19,30 @@ class DisplayDriver {
 public:
   DisplayDriver();
   void begin();
-  void drawClock(int hour, int minute, int second);
-  void drawWeather(float temp, String condition);
+  void drawDashboard(const WatchStateSnapshot &snapshot);
   void drawConnecting(String ssid);
   void drawQRCode(String data, int startX, int startY, int scale);
   void drawAPInfo(String ssid, String pass, String ip);
   void setBrightness(uint8_t brightness);
-  void clearMainSegments(); // Очистка экрана после загрузки
+  uint8_t getBrightness() const { return currentBrightness; }
+  void clearMainSegments();
 
 private:
-  Arduino_DataBus *bus;
-  Arduino_GFX *gfx;
-  Arduino_Canvas *clockCanvas;   // Буфер для часов (без мерцания)
-  Arduino_Canvas *weatherCanvas; // Буфер для погоды (без мерцания)
+  Arduino_DataBus *bus = nullptr;
+  Arduino_GFX *gfx = nullptr;
+  Arduino_Canvas *clockCanvas = nullptr;
+  Arduino_Canvas *infoCanvas = nullptr;
+  uint8_t currentBrightness = 255;
 
-  // Helper methods for drawing UI elements
   void drawBackground();
+  void drawTimePanel(const WatchStateSnapshot &snapshot, bool showColon);
+  void drawWeatherPanel(const WatchStateSnapshot &snapshot);
+  void drawAlarmIcon(Arduino_GFX *target, int x, int y, bool enabled,
+                     uint16_t color);
+  String formatTemperature(float temp);
+  String getWeekdayLabel(int weekdayIndex);
+  String getMonthLabel(int monthIndex);
+  String getConditionLabel(const String &condition, const String &iconCode);
 };
 
 #endif // DISPLAY_DRIVER_H

@@ -4,44 +4,67 @@
 #include <ESPmDNS.h>
 #include <Preferences.h>
 
-// Определение статического мьютекса
 SemaphoreHandle_t WatchNetworkManager::systemMutex = NULL;
 
 WatchNetworkManager::WatchNetworkManager()
     : timeClient(new NTPClient(ntpUDP, NTP_SERVER, GMT_OFFSET_SEC,
                                DAYLIGHT_OFFSET_SEC)),
-      lastWeatherUpdate(0), currentTemp(0.0), currentCondition("--"),
-      currentIcon(""), timeOffset(5), weatherCity("Almaty"), alarmHour(0),
-      alarmMinute(0), alarmSoundId(1), alarmVolume(20), alarmCarEffect(1),
-      alarmLedEffect(1), alarmEnabled(false), alarmTriggeredToday(false),
-      lastTriggerMinute(-1), apMode(false) {}
+      lastWeatherUpdate(0), state(), stateMutex(NULL), lastTriggerMinute(-1) {}
 
 void WatchNetworkManager::begin() {
   if (systemMutex == NULL) {
     systemMutex = xSemaphoreCreateMutex();
   }
+  if (stateMutex == NULL) {
+    stateMutex = xSemaphoreCreateMutex();
+  }
 
-  xSemaphoreTake(systemMutex, portMAX_DELAY);
+  String ssid;
+  String pass;
+  int timeOffset = 5;
+  String weatherCity = "Almaty";
+  int alarmHour = 0;
+  int alarmMinute = 0;
+  int alarmSoundId = 1;
+  int alarmVolume = 20;
+  int alarmCarEffect = 1;
+  int alarmLedEffect = 1;
+  bool alarmEnabled = false;
 
-  preferences.begin("watch-config", false);
-  String ssid = preferences.getString("ssid", "");
-  String pass = preferences.getString("pass", "");
+  if (systemMutex != NULL && xSemaphoreTake(systemMutex, portMAX_DELAY) == pdTRUE) {
+    preferences.begin("watch-config", false);
+    ssid = preferences.getString("ssid", "");
+    pass = preferences.getString("pass", "");
+    timeOffset = preferences.getInt("timeOffset", 5);
+    weatherCity = preferences.getString("city", "Almaty");
+    alarmHour = preferences.getInt("alarmHour", 0);
+    alarmMinute = preferences.getInt("alarmMinute", 0);
+    alarmSoundId = preferences.getInt("alarmSound", 1);
+    alarmVolume = preferences.getInt("alarmVol", 20);
+    alarmCarEffect = preferences.getInt("alarmCarEff", 1);
+    alarmLedEffect = preferences.getInt("alarmLedEff", 1);
+    alarmEnabled = preferences.getBool("alarmEnabled", false);
+    preferences.end();
+    xSemaphoreGive(systemMutex);
+  }
 
-  // Load localization settings
-  timeOffset = preferences.getInt("timeOffset", 5);
-  weatherCity = preferences.getString("city", "Almaty");
-
-  // Load alarm settings
-  alarmHour = preferences.getInt("alarmHour", 0);
-  alarmMinute = preferences.getInt("alarmMinute", 0);
-  alarmSoundId = preferences.getInt("alarmSound", 1);
-  alarmVolume = preferences.getInt("alarmVol", 20);
-  alarmCarEffect = preferences.getInt("alarmCarEff", 1); // Default ACE_BLINK
-  alarmLedEffect = preferences.getInt("alarmLedEff", 1); // Default RAINBOW
-  alarmEnabled = preferences.getBool("alarmEnabled", false);
-
-  preferences.end();
-  xSemaphoreGive(systemMutex);
+  if (stateMutex != NULL && xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    state.timeZoneOffset = timeOffset;
+    state.weatherCity = weatherCity;
+    state.alarmHour = alarmHour;
+    state.alarmMinute = alarmMinute;
+    state.alarmSoundId = alarmSoundId;
+    state.alarmVolume = alarmVolume;
+    state.alarmCarEffect = alarmCarEffect;
+    state.alarmLedEffect = alarmLedEffect;
+    state.alarmEnabled = alarmEnabled;
+    state.connected = false;
+    state.apMode = false;
+    state.ipAddress = "";
+    state.apSSID = "";
+    state.apPassword = "";
+    xSemaphoreGive(stateMutex);
+  }
 
   if (ssid == "") {
     if (String(WIFI_SSID) != "" && String(WIFI_SSID) != "YOUR_WIFI_SSID") {
@@ -64,8 +87,7 @@ void WatchNetworkManager::begin() {
   Serial.println(ssid);
 
   int retries = 0;
-  while (WiFi.status() != WL_CONNECTED &&
-         retries < 40) { // Wait up to 20 seconds
+  while (WiFi.status() != WL_CONNECTED && retries < 40) {
     delay(500);
     Serial.print(".");
     retries++;
@@ -81,9 +103,14 @@ void WatchNetworkManager::begin() {
       MDNS.addService("http", "tcp", 80);
     }
 
-    timeClient->setTimeOffset(timeOffset * 3600);
-    timeClient->begin();
-    apMode = false;
+    if (timeClient != NULL) {
+      timeClient->setTimeOffset(timeOffset * 3600);
+      timeClient->begin();
+      timeClient->update();
+      refreshTimeState();
+    }
+
+    refreshConnectionState(true, false, WiFi.localIP().toString());
   } else {
     Serial.println("\nConnection failed. Starting AP fallback.");
     setupAP();
@@ -96,15 +123,16 @@ void WatchNetworkManager::setupAP() {
   WiFi.mode(WIFI_OFF);
   delay(100);
 
-  apMode = true;
   WiFi.mode(WIFI_AP);
   delay(100);
 
-  String apSSID = "LC200-Watch-" + String((uint32_t)ESP.getEfuseMac(), HEX);
-  bool success = WiFi.softAP(apSSID.c_str(), "12345678"); // Default password
+  const String apSSID = "LC200-Watch-" + String((uint32_t)ESP.getEfuseMac(), HEX);
+  String apPassword = "12345678";
 
+  bool success = WiFi.softAP(apSSID.c_str(), apPassword.c_str());
   if (!success) {
     Serial.println("AP Failed! Trying without password...");
+    apPassword = "";
     WiFi.softAP(apSSID.c_str());
   }
 
@@ -118,19 +146,69 @@ void WatchNetworkManager::setupAP() {
   Serial.println(apSSID);
   Serial.print("IP: ");
   Serial.println(WiFi.softAPIP());
+
+  refreshConnectionState(false, true, WiFi.softAPIP().toString(), apSSID,
+                         apPassword);
+}
+
+void WatchNetworkManager::refreshConnectionState(bool connected, bool apMode,
+                                                 const String &ipAddress,
+                                                 const String &apSSID,
+                                                 const String &apPassword) {
+  if (stateMutex == NULL) {
+    return;
+  }
+
+  if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    state.connected = connected;
+    state.apMode = apMode;
+    state.ipAddress = ipAddress;
+    state.apSSID = apSSID;
+    state.apPassword = apPassword;
+    xSemaphoreGive(stateMutex);
+  }
+}
+
+void WatchNetworkManager::refreshTimeState() {
+  if (timeClient == NULL || stateMutex == NULL) {
+    return;
+  }
+
+  time_t rawTime = timeClient->getEpochTime();
+  struct tm timeInfo = {};
+  localtime_r(&rawTime, &timeInfo);
+
+  if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    state.formattedTime = timeClient->getFormattedTime();
+    state.hour = timeClient->getHours();
+    state.minute = timeClient->getMinutes();
+    state.second = timeClient->getSeconds();
+    state.weekdayIndex = timeInfo.tm_wday;
+    state.dayOfMonth = timeInfo.tm_mday > 0 ? timeInfo.tm_mday : 1;
+    state.monthIndex = timeInfo.tm_mon >= 0 ? timeInfo.tm_mon + 1 : 1;
+    state.year = timeInfo.tm_year > 0 ? timeInfo.tm_year + 1900 : 1970;
+    xSemaphoreGive(stateMutex);
+  }
 }
 
 void WatchNetworkManager::update() {
+  const bool apMode = isAPMode();
+
   if (!apMode && WiFi.status() == WL_CONNECTED) {
-    timeClient->update();
+    refreshConnectionState(true, false, WiFi.localIP().toString());
+
+    if (timeClient != NULL) {
+      timeClient->update();
+      refreshTimeState();
+    }
 
     if (millis() - lastWeatherUpdate > WEATHER_UPDATE_INTERVAL_MS ||
         lastWeatherUpdate == 0) {
       updateWeather();
     }
   } else if (!apMode) {
-    // Попытка переподключения если связь потеряна (раз в 30 секунд не блокируя
-    // поток)
+    refreshConnectionState(false, false, "");
+
     static unsigned long lastReconnectAttempt = 0;
     if (millis() - lastReconnectAttempt > 30000) {
       lastReconnectAttempt = millis();
@@ -141,97 +219,260 @@ void WatchNetworkManager::update() {
   }
 }
 
-String WatchNetworkManager::getFormattedTime() {
-  return timeClient->getFormattedTime();
+WatchStateSnapshot WatchNetworkManager::getSnapshot() {
+  WatchStateSnapshot snapshot;
+
+  if (stateMutex != NULL && xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    snapshot = state;
+    xSemaphoreGive(stateMutex);
+  }
+
+  return snapshot;
 }
 
-int WatchNetworkManager::getHour() { return timeClient->getHours(); }
+String WatchNetworkManager::getFormattedTime() {
+  if (stateMutex == NULL) {
+    return "--:--:--";
+  }
 
-int WatchNetworkManager::getMinute() { return timeClient->getMinutes(); }
+  String formattedTime = "--:--:--";
+  if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    formattedTime = state.formattedTime;
+    xSemaphoreGive(stateMutex);
+  }
 
-int WatchNetworkManager::getSecond() { return timeClient->getSeconds(); }
+  return formattedTime;
+}
+
+int WatchNetworkManager::getHour() {
+  if (stateMutex == NULL) {
+    return 0;
+  }
+
+  int value = 0;
+  if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    value = state.hour;
+    xSemaphoreGive(stateMutex);
+  }
+
+  return value;
+}
+
+int WatchNetworkManager::getMinute() {
+  if (stateMutex == NULL) {
+    return 0;
+  }
+
+  int value = 0;
+  if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    value = state.minute;
+    xSemaphoreGive(stateMutex);
+  }
+
+  return value;
+}
+
+int WatchNetworkManager::getSecond() {
+  if (stateMutex == NULL) {
+    return 0;
+  }
+
+  int value = 0;
+  if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    value = state.second;
+    xSemaphoreGive(stateMutex);
+  }
+
+  return value;
+}
 
 int WatchNetworkManager::getYear() {
-  time_t rawtime = timeClient->getEpochTime();
-  struct tm *ti;
-  ti = localtime(&rawtime);
-  return ti->tm_year + 1900;
+  if (stateMutex == NULL) {
+    return 1970;
+  }
+
+  int value = 1970;
+  if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    value = state.year;
+    xSemaphoreGive(stateMutex);
+  }
+
+  return value;
 }
 
-float WatchNetworkManager::getTemperature() { return currentTemp; }
+float WatchNetworkManager::getTemperature() {
+  if (stateMutex == NULL) {
+    return 0.0f;
+  }
 
-String WatchNetworkManager::getWeatherCondition() { return currentCondition; }
+  float value = 0.0f;
+  if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    value = state.temperature;
+    xSemaphoreGive(stateMutex);
+  }
 
-String WatchNetworkManager::getWeatherIcon() { return currentIcon; }
+  return value;
+}
+
+String WatchNetworkManager::getWeatherCondition() {
+  if (stateMutex == NULL) {
+    return "--";
+  }
+
+  String value = "--";
+  if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    value = state.weatherCondition;
+    xSemaphoreGive(stateMutex);
+  }
+
+  return value;
+}
+
+String WatchNetworkManager::getWeatherIcon() {
+  if (stateMutex == NULL) {
+    return "";
+  }
+
+  String value;
+  if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    value = state.weatherIcon;
+    xSemaphoreGive(stateMutex);
+  }
+
+  return value;
+}
 
 bool WatchNetworkManager::isConnected() {
-  return WiFi.status() == WL_CONNECTED;
+  if (stateMutex == NULL) {
+    return false;
+  }
+
+  bool value = false;
+  if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    value = state.connected;
+    xSemaphoreGive(stateMutex);
+  }
+
+  return value;
 }
 
-bool WatchNetworkManager::isAPMode() { return apMode; }
+bool WatchNetworkManager::isAPMode() {
+  if (stateMutex == NULL) {
+    return false;
+  }
+
+  bool value = false;
+  if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    value = state.apMode;
+    xSemaphoreGive(stateMutex);
+  }
+
+  return value;
+}
 
 String WatchNetworkManager::getApSSID() {
-  return "LC200-Watch-" + String((uint32_t)ESP.getEfuseMac(), HEX);
+  if (stateMutex == NULL) {
+    return "";
+  }
+
+  String value;
+  if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    value = state.apSSID;
+    xSemaphoreGive(stateMutex);
+  }
+
+  return value;
 }
 
-String WatchNetworkManager::getApPassword() { return "12345678"; }
+String WatchNetworkManager::getApPassword() {
+  if (stateMutex == NULL) {
+    return "";
+  }
+
+  String value;
+  if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    value = state.apPassword;
+    xSemaphoreGive(stateMutex);
+  }
+
+  return value;
+}
 
 String WatchNetworkManager::getIpAddress() {
-  if (apMode)
-    return WiFi.softAPIP().toString();
-  return WiFi.localIP().toString();
+  if (stateMutex == NULL) {
+    return "";
+  }
+
+  String value;
+  if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    value = state.ipAddress;
+    xSemaphoreGive(stateMutex);
+  }
+
+  return value;
 }
 
 void WatchNetworkManager::saveWiFiCredentials(String ssid, String pass) {
-  xSemaphoreTake(systemMutex, portMAX_DELAY);
-  preferences.begin("watch-config", false);
-  preferences.putString("ssid", ssid);
-  preferences.putString("pass", pass);
-  preferences.end();
-  xSemaphoreGive(systemMutex);
+  if (systemMutex != NULL && xSemaphoreTake(systemMutex, portMAX_DELAY) == pdTRUE) {
+    preferences.begin("watch-config", false);
+    preferences.putString("ssid", ssid);
+    preferences.putString("pass", pass);
+    preferences.end();
+    xSemaphoreGive(systemMutex);
+  }
+
   Serial.println("Credentials saved. Please reboot.");
 }
 
 void WatchNetworkManager::saveLocalizationSettings(int timezoneOffset,
                                                    String city) {
-  timeOffset = timezoneOffset;
-  weatherCity = city;
-
-  xSemaphoreTake(systemMutex, portMAX_DELAY);
-  preferences.begin("watch-config", false);
-  preferences.putInt("timeOffset", timezoneOffset);
-  preferences.putString("city", city);
-  preferences.end();
-  xSemaphoreGive(systemMutex);
-
-  // Update NTP client and Weather if connected
-  if (!apMode && WiFi.status() == WL_CONNECTED) {
-    timeClient->setTimeOffset(timeOffset * 3600);
-    timeClient->forceUpdate();
-    updateWeather(); // Принудительно обновляем погоду для нового города
+  if (stateMutex != NULL && xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    state.timeZoneOffset = timezoneOffset;
+    state.weatherCity = city;
+    xSemaphoreGive(stateMutex);
   }
+
+  if (systemMutex != NULL && xSemaphoreTake(systemMutex, portMAX_DELAY) == pdTRUE) {
+    preferences.begin("watch-config", false);
+    preferences.putInt("timeOffset", timezoneOffset);
+    preferences.putString("city", city);
+    preferences.end();
+    xSemaphoreGive(systemMutex);
+  }
+
+  if (!isAPMode() && WiFi.status() == WL_CONNECTED && timeClient != NULL) {
+    timeClient->setTimeOffset(timezoneOffset * 3600);
+    timeClient->forceUpdate();
+    refreshTimeState();
+    updateWeather();
+  }
+
   Serial.println("Localization settings saved.");
 }
 
 void WatchNetworkManager::saveAlarm(int hour, int minute, int soundId,
                                     int carEff, int ledEff, bool enabled) {
-  alarmHour = hour;
-  alarmMinute = minute;
-  alarmSoundId = soundId;
-  alarmCarEffect = carEff;
-  alarmLedEffect = ledEff;
-  alarmEnabled = enabled;
+  if (stateMutex != NULL && xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    state.alarmHour = hour;
+    state.alarmMinute = minute;
+    state.alarmSoundId = soundId;
+    state.alarmCarEffect = carEff;
+    state.alarmLedEffect = ledEff;
+    state.alarmEnabled = enabled;
+    xSemaphoreGive(stateMutex);
+  }
 
-  xSemaphoreTake(systemMutex, portMAX_DELAY);
-  preferences.begin("watch-config", false);
-  preferences.putInt("alarmHour", hour);
-  preferences.putInt("alarmMinute", minute);
-  preferences.putInt("alarmSound", soundId);
-  preferences.putInt("alarmCarEff", carEff);
-  preferences.putInt("alarmLedEff", ledEff);
-  preferences.putBool("alarmEnabled", enabled);
-  preferences.end();
-  xSemaphoreGive(systemMutex);
+  if (systemMutex != NULL && xSemaphoreTake(systemMutex, portMAX_DELAY) == pdTRUE) {
+    preferences.begin("watch-config", false);
+    preferences.putInt("alarmHour", hour);
+    preferences.putInt("alarmMinute", minute);
+    preferences.putInt("alarmSound", soundId);
+    preferences.putInt("alarmCarEff", carEff);
+    preferences.putInt("alarmLedEff", ledEff);
+    preferences.putBool("alarmEnabled", enabled);
+    preferences.end();
+    xSemaphoreGive(systemMutex);
+  }
 
   Serial.printf("Alarm saved: %02d:%02d, Sound: %d, CarEff: %d, LedEff: %d, "
                 "Enabled: %d\n",
@@ -239,81 +480,273 @@ void WatchNetworkManager::saveAlarm(int hour, int minute, int soundId,
 }
 
 void WatchNetworkManager::saveAlarmVolume(int volume) {
-  alarmVolume = volume;
-  xSemaphoreTake(systemMutex, portMAX_DELAY);
-  preferences.begin("watch-config", false);
-  preferences.putInt("alarmVol", volume);
-  preferences.end();
-  xSemaphoreGive(systemMutex);
+  if (stateMutex != NULL && xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    state.alarmVolume = volume;
+    xSemaphoreGive(stateMutex);
+  }
+
+  if (systemMutex != NULL && xSemaphoreTake(systemMutex, portMAX_DELAY) == pdTRUE) {
+    preferences.begin("watch-config", false);
+    preferences.putInt("alarmVol", volume);
+    preferences.end();
+    xSemaphoreGive(systemMutex);
+  }
+
   Serial.printf("Alarm volume saved: %d\n", volume);
 }
 
-bool WatchNetworkManager::checkAlarmTrigger() {
-  if (!alarmEnabled || apMode || WiFi.status() != WL_CONNECTED)
-    return false;
-
-  int currentH = getHour();
-  int currentM = getMinute();
-
-  // Trigger if time matches and we haven't triggered this minute yet
-  if (currentH == alarmHour && currentM == alarmMinute) {
-    if (lastTriggerMinute != currentM) {
-      lastTriggerMinute = currentM;
-      return true;
-    }
+bool WatchNetworkManager::setAlarmEnabled(bool enabled) {
+  if (stateMutex != NULL && xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    state.alarmEnabled = enabled;
+    xSemaphoreGive(stateMutex);
   } else {
-    // Reset lastTriggerMinute if we moved past the alarm minute
-    if (lastTriggerMinute != -1)
-      lastTriggerMinute = -1;
+    state.alarmEnabled = enabled;
   }
 
-  return false;
+  if (systemMutex != NULL && xSemaphoreTake(systemMutex, portMAX_DELAY) == pdTRUE) {
+    preferences.begin("watch-config", false);
+    preferences.putBool("alarmEnabled", enabled);
+    preferences.end();
+    xSemaphoreGive(systemMutex);
+  }
+
+  Serial.printf("Alarm enabled set to: %d\n", enabled);
+  return enabled;
+}
+
+bool WatchNetworkManager::toggleAlarmEnabled() {
+  bool enabled = false;
+
+  if (stateMutex != NULL && xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    state.alarmEnabled = !state.alarmEnabled;
+    enabled = state.alarmEnabled;
+    xSemaphoreGive(stateMutex);
+  } else {
+    state.alarmEnabled = !state.alarmEnabled;
+    enabled = state.alarmEnabled;
+  }
+
+  if (systemMutex != NULL && xSemaphoreTake(systemMutex, portMAX_DELAY) == pdTRUE) {
+    preferences.begin("watch-config", false);
+    preferences.putBool("alarmEnabled", enabled);
+    preferences.end();
+    xSemaphoreGive(systemMutex);
+  }
+
+  Serial.printf("Alarm toggled. Enabled: %d\n", enabled);
+  return enabled;
+}
+
+int WatchNetworkManager::getAlarmHour() {
+  if (stateMutex == NULL) {
+    return 0;
+  }
+
+  int value = 0;
+  if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    value = state.alarmHour;
+    xSemaphoreGive(stateMutex);
+  }
+
+  return value;
+}
+
+int WatchNetworkManager::getAlarmMinute() {
+  if (stateMutex == NULL) {
+    return 0;
+  }
+
+  int value = 0;
+  if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    value = state.alarmMinute;
+    xSemaphoreGive(stateMutex);
+  }
+
+  return value;
+}
+
+int WatchNetworkManager::getAlarmSoundId() {
+  if (stateMutex == NULL) {
+    return 1;
+  }
+
+  int value = 1;
+  if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    value = state.alarmSoundId;
+    xSemaphoreGive(stateMutex);
+  }
+
+  return value;
+}
+
+int WatchNetworkManager::getAlarmVolume() {
+  if (stateMutex == NULL) {
+    return 20;
+  }
+
+  int value = 20;
+  if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    value = state.alarmVolume;
+    xSemaphoreGive(stateMutex);
+  }
+
+  return value;
+}
+
+int WatchNetworkManager::getAlarmCarEffect() {
+  if (stateMutex == NULL) {
+    return 1;
+  }
+
+  int value = 1;
+  if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    value = state.alarmCarEffect;
+    xSemaphoreGive(stateMutex);
+  }
+
+  return value;
+}
+
+int WatchNetworkManager::getAlarmLedEffect() {
+  if (stateMutex == NULL) {
+    return 1;
+  }
+
+  int value = 1;
+  if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    value = state.alarmLedEffect;
+    xSemaphoreGive(stateMutex);
+  }
+
+  return value;
+}
+
+bool WatchNetworkManager::isAlarmEnabled() {
+  if (stateMutex == NULL) {
+    return false;
+  }
+
+  bool value = false;
+  if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    value = state.alarmEnabled;
+    xSemaphoreGive(stateMutex);
+  }
+
+  return value;
+}
+
+bool WatchNetworkManager::checkAlarmTrigger() {
+  if (stateMutex == NULL) {
+    return false;
+  }
+
+  bool shouldTrigger = false;
+
+  if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    if (!state.alarmEnabled || state.apMode || !state.connected) {
+      xSemaphoreGive(stateMutex);
+      return false;
+    }
+
+    if (state.hour == state.alarmHour && state.minute == state.alarmMinute) {
+      if (lastTriggerMinute != state.minute) {
+        lastTriggerMinute = state.minute;
+        shouldTrigger = true;
+      }
+    } else if (lastTriggerMinute != -1) {
+      lastTriggerMinute = -1;
+    }
+
+    xSemaphoreGive(stateMutex);
+  }
+
+  return shouldTrigger;
 }
 
 void WatchNetworkManager::resetAlarmTrigger() {
-  // This could also disable the alarm if it's not a repeating one
-  // For now, we just let the logic in checkAlarmTrigger handle the per-minute
-  // block
+  if (stateMutex != NULL && xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    lastTriggerMinute = state.minute;
+    xSemaphoreGive(stateMutex);
+  }
 }
 
-int WatchNetworkManager::getTimeZoneOffset() { return timeOffset; }
+int WatchNetworkManager::getTimeZoneOffset() {
+  if (stateMutex == NULL) {
+    return 5;
+  }
 
-String WatchNetworkManager::getWeatherCity() { return weatherCity; }
+  int value = 5;
+  if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    value = state.timeZoneOffset;
+    xSemaphoreGive(stateMutex);
+  }
+
+  return value;
+}
+
+String WatchNetworkManager::getWeatherCity() {
+  if (stateMutex == NULL) {
+    return "Almaty";
+  }
+
+  String value = "Almaty";
+  if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    value = state.weatherCity;
+    xSemaphoreGive(stateMutex);
+  }
+
+  return value;
+}
 
 void WatchNetworkManager::updateWeather() {
-  if (WiFi.status() != WL_CONNECTED)
+  if (WiFi.status() != WL_CONNECTED) {
     return;
+  }
+
+  String city = "Almaty";
+  if (stateMutex != NULL && xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    city = state.weatherCity;
+    xSemaphoreGive(stateMutex);
+  }
+
+  String encodedCity = city;
+  encodedCity.replace(" ", "%20");
 
   HTTPClient http;
-  // Окружаем город кавычками или проверяем пробелы (лучше кодировать, если
-  // будут сложные названия)
   String url =
-      "http://api.openweathermap.org/data/2.5/weather?q=" + weatherCity +
+      "http://api.openweathermap.org/data/2.5/weather?q=" + encodedCity +
       "&units=metric&appid=" + String(WEATHER_API_KEY) + "&lang=ru";
 
-  lastWeatherUpdate =
-      millis(); // Сбрасываем таймер здесь, чтобы избежать циклов при ошибках
+  lastWeatherUpdate = millis();
   Serial.print("Updating weather for: ");
-  Serial.println(weatherCity);
+  Serial.println(city);
 
   http.begin(url);
   int httpCode = http.GET();
 
   if (httpCode == HTTP_CODE_OK) {
     String payload = http.getString();
-    DynamicJsonDocument doc(2048); // Увеличим буфер для надежности
+    DynamicJsonDocument doc(2048);
     DeserializationError error = deserializeJson(doc, payload);
 
     if (!error) {
-      if (doc.containsKey("main")) {
-        currentTemp = doc["main"]["temp"].as<float>();
-        const char *desc = doc["weather"][0]["description"];
-        currentCondition = String(desc);
-        const char *icon = doc["weather"][0]["icon"];
-        currentIcon = String(icon);
-        Serial.printf("Weather updated: %.1f C, %s\n", currentTemp, desc);
+      if (doc.containsKey("main") && doc["weather"][0].is<JsonObject>()) {
+        const float temperature = doc["main"]["temp"].as<float>();
+        const String condition = String(doc["weather"][0]["description"] | "--");
+        const String icon = String(doc["weather"][0]["icon"] | "");
+
+        if (stateMutex != NULL &&
+            xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+          state.temperature = temperature;
+          state.weatherCondition = condition;
+          state.weatherIcon = icon;
+          xSemaphoreGive(stateMutex);
+        }
+
+        Serial.printf("Weather updated: %.1f C, %s\n", temperature,
+                      condition.c_str());
       } else {
-        Serial.println("Error: No 'main' in JSON");
+        Serial.println("Error: incomplete weather JSON");
       }
     } else {
       Serial.print("JSON Error: ");

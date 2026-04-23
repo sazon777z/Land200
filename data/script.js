@@ -9,6 +9,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('brightnessRange').addEventListener('change', (e) => {
         setBrightness(e.target.value);
     });
+    document.getElementById('alarmEnabled').addEventListener('change', (e) => {
+        toggleAlarm(e.target.checked);
+    });
 });
 
 async function fetchStatus() {
@@ -20,6 +23,7 @@ async function fetchStatus() {
         document.getElementById('timeValue').textContent = data.time;
         document.getElementById('tempValue').textContent = data.temp + '°C';
         document.getElementById('weatherValue').textContent = data.condition;
+        document.getElementById('alarmEnabled').checked = data.alarm_enabled;
 
         document.getElementById('connectionStatus').classList.add('online');
     } catch (error) {
@@ -73,7 +77,19 @@ async function testSound() {
 }
 
 async function setBrightness(val) {
-    fetch('/api/settings/brightness?val=' + val);
+    fetch('/api/settings/disp_bright?val=' + val);
+}
+
+async function toggleAlarm(enabled) {
+    try {
+        await fetch('/api/alarm/enabled', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: enabled })
+        });
+    } catch (e) {
+        console.error('Error toggling alarm:', e);
+    }
 }
 
 async function rebootSystem() {

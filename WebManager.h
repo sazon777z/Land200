@@ -21,9 +21,13 @@ private:
     WatchNetworkManager* net;
     AudioDriver* audio;
     LedDriver* led;
-    DisplayDriver* display;
+  DisplayDriver* display;
+  bool restartPending;
+  unsigned long restartAtMs;
     
-    void setupRoutes();
+  void setupRoutes();
+  void scheduleRestart(unsigned long delayMs);
+  void stopAlarmPlayback();
 };
 
 #endif // WEB_MANAGER_H

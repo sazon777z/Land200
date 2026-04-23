@@ -21,24 +21,74 @@ TaskHandle_t TaskWebHandle;
 // Mutex for SPI Display access
 SemaphoreHandle_t displayMutex;
 
+namespace {
+constexpr unsigned long kButtonDebounceMs = 40;
+constexpr unsigned long kDoublePressWindowMs = 350;
+
+void stopAlarmOutput() {
+  audio.stop();
+  led.setModeIdle();
+  network.resetAlarmTrigger();
+}
+} // namespace
+
 // Button Check (Non-blocking)
 void checkButton() {
-  static bool btnPressed = false;
-  static unsigned long lastDebounceTime = 0;
+  static bool lastReading = false;
+  static bool stablePressed = false;
+  static bool handledAlarmStop = false;
+  static uint8_t clickCount = 0;
+  static unsigned long lastTransitionMs = 0;
+  static unsigned long firstClickAtMs = 0;
 
-  bool currentReading = (digitalRead(PIN_BUTTON) == LOW); // Active Low
+  const unsigned long now = millis();
+  const bool currentReading = (digitalRead(PIN_BUTTON) == LOW); // Active Low
 
-  if (currentReading && !btnPressed) {
-    if (millis() - lastDebounceTime > 50) { // Debounce
-      btnPressed = true;
-      Serial.println("Button Pressed: Stopping Sound");
-      audio.stop();
-      led.setModeIdle();
-      lastDebounceTime = millis();
+  if (currentReading != lastReading) {
+    lastReading = currentReading;
+    lastTransitionMs = now;
+  }
+
+  if (now - lastTransitionMs < kButtonDebounceMs) {
+    return;
+  }
+
+  if (stablePressed != currentReading) {
+    stablePressed = currentReading;
+
+    if (stablePressed) {
+      if (led.isAlarmActive()) {
+        Serial.println("Button Pressed: Stopping active alarm");
+        stopAlarmOutput();
+        handledAlarmStop = true;
+        clickCount = 0;
+        firstClickAtMs = 0;
+      }
+      return;
     }
-  } else if (!currentReading && btnPressed) {
-    btnPressed = false;
-    lastDebounceTime = millis();
+
+    if (handledAlarmStop) {
+      handledAlarmStop = false;
+      return;
+    }
+
+    if (clickCount == 0 || now - firstClickAtMs > kDoublePressWindowMs) {
+      clickCount = 1;
+      firstClickAtMs = now;
+      return;
+    }
+
+    clickCount = 0;
+    firstClickAtMs = 0;
+    const bool enabled = network.toggleAlarmEnabled();
+    Serial.printf("Button Double Press: Alarm %s\n",
+                  enabled ? "enabled" : "disabled");
+  }
+
+  if (!stablePressed && clickCount == 1 &&
+      now - firstClickAtMs > kDoublePressWindowMs) {
+    clickCount = 0;
+    firstClickAtMs = 0;
   }
 }
 
@@ -46,14 +96,16 @@ void checkButton() {
 void TaskDisplay(void *pvParameters) {
   (void)pvParameters;
   for (;;) {
-    if (network.isAPMode()) {
+    const WatchStateSnapshot snapshot = network.getSnapshot();
+
+    if (snapshot.apMode) {
       if (xSemaphoreTake(displayMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-        display.drawAPInfo(network.getApSSID(), network.getApPassword(),
-                           network.getIpAddress());
+        display.drawAPInfo(snapshot.apSSID, snapshot.apPassword,
+                           snapshot.ipAddress);
         xSemaphoreGive(displayMutex);
       }
       vTaskDelay(pdMS_TO_TICKS(5000));
-    } else if (!network.isConnected()) {
+    } else if (!snapshot.connected) {
       vTaskDelay(pdMS_TO_TICKS(1000));
     } else {
       static bool firstRun = true;
@@ -62,10 +114,7 @@ void TaskDisplay(void *pvParameters) {
           display.clearMainSegments();
           firstRun = false;
         }
-        display.drawClock(network.getHour(), network.getMinute(),
-                          network.getSecond());
-        display.drawWeather(network.getTemperature(),
-                            network.getWeatherCondition());
+        display.drawDashboard(snapshot);
         xSemaphoreGive(displayMutex);
       }
       vTaskDelay(pdMS_TO_TICKS(1000));
@@ -80,15 +129,16 @@ void TaskNetwork(void *pvParameters) {
     audio.processQueue(); // Process any pending sound commands
 
     if (network.checkAlarmTrigger()) {
+      const WatchStateSnapshot snapshot = network.getSnapshot();
       Serial.println("ALARM TRIGGERED!");
-      audio.setVolume(network.getAlarmVolume());
-      audio.playAlarmSound(network.getAlarmSoundId());
+      audio.setVolume(snapshot.alarmVolume);
+      audio.playAlarmSound(snapshot.alarmSoundId);
 
       // Use user-selected effects for car lights and underglow
       LedDriver::AlarmCarEffect carEff =
-          (LedDriver::AlarmCarEffect)network.getAlarmCarEffect();
+          (LedDriver::AlarmCarEffect)snapshot.alarmCarEffect;
       LedDriver::LedEffect ledEff =
-          (LedDriver::LedEffect)network.getAlarmLedEffect();
+          (LedDriver::LedEffect)snapshot.alarmLedEffect;
       led.setModeAlarm(carEff, ledEff);
     }
     vTaskDelay(pdMS_TO_TICKS(100)); // More frequent check for queue/alarm

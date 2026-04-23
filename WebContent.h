@@ -59,6 +59,14 @@ const char index_html[] PROGMEM = R"rawliteral(
                         <span id="savedAlarmBadge" class="label" style="background:rgba(255,255,255,0.1); padding:4px 8px; border-radius:12px; font-weight:700;">Выкл</span>
                     </div>
                     
+                    <div class="control-group" style="display:flex; justify-content:space-between; align-items:center;">
+                        <label for="alarmEnabled">Состояние</label>
+                        <label class="switch">
+                            <input type="checkbox" id="alarmEnabled">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+
                     <div class="control-group">
                         <label for="alarmTime">Установка времени</label>
                         <input type="time" id="alarmTime" data-dirty="false">
@@ -395,6 +403,13 @@ input[type="time"], select, input[type="range"], input[type="text"], input[type=
     .icon-btn { width: 45px; height: 45px; padding: 8px; }
 }
 
+/* Switch Styling */
+.switch { position: relative; display: inline-block; width: 40px; height: 20px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.1); transition: .4s; border: 1px solid var(--glass-border); border-radius: 20px; }
+.slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; }
+input:checked + .slider { background-color: var(--primary-color); }
+input:checked + .slider:before { transform: translateX(19px); }
 )rawliteral";
 
 const char script_js[] PROGMEM = R"rawliteral(
@@ -428,7 +443,15 @@ document.addEventListener('DOMContentLoaded', () => {
     addListener('testSoundBtn', 'click', testSound);
     addListener('stopSoundBtn', 'click', stopSound);
     addListener('rebootBtn', 'click', rebootSystem);
+    addListener('alarmEnabled', 'change', (e) => { toggleAlarm(e.target.checked); });
     addListener('ledEffect', 'change', (e) => { setLedEffect(e.target.value); });
+        document.querySelectorAll('.effect-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.effect-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            setLedEffect(btn.dataset.effect);
+        });
+    });
     addListener('ledColor', 'change', (e) => { setLedColor(e.target.value); });
     addListener('ledBrightRange', 'input', (e) => { setLedBrightness(e.target.value); });
     addListener('ledSpeedRange', 'input', (e) => { setLedSpeed(e.target.value); });
@@ -513,6 +536,8 @@ async function fetchStatus() {
         document.getElementById('tempValue').textContent = data.temp + '\u00B0C';
         document.getElementById('weatherValue').textContent = translateCondition(data.condition);
         document.getElementById('cityValue').textContent = translateCity(data.city);
+        const alarmToggle = document.getElementById('alarmEnabled');
+        if (alarmToggle) alarmToggle.checked = data.alarm_enabled;
         document.getElementById('connectionStatus').className = 'status-indicator online';
         
         // Update Alarm Badge and Time
@@ -534,6 +559,11 @@ async function fetchStatus() {
         updateField('alarmLedEff', data.alarm_led_eff);
         updateField('alarmVolumeRange', data.alarm_volume);
         
+        updateField('ledEffect', data.led_effect);
+        updateField('ledBrightRange', data.led_bright); // Убедитесь что led_bright есть в JSON
+        updateField('ledSpeedRange', data.led_speed);
+        updateField('dispBrightRange', data.disp_bright);
+
         updateField('timeZone', data.tz);
         updateField('weatherCity', data.city);
 
@@ -653,6 +683,16 @@ async function setLedColor(val) {
 async function setTurnSignal(val) {
     fetch('/api/settings/turn_signal?mode=' + val);
 }
+async function toggleAlarm(enabled) {
+    try {
+        await fetch('/api/alarm/enabled', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: enabled })
+        });
+    } catch (e) { console.error('Error toggling alarm:', e); }
+}
+
 async function rebootSystem() {
     if (confirm('Перезагрузить систему?')) { fetch('/api/system/reboot'); }
 }

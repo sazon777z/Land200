@@ -4,6 +4,8 @@
 #include "config.h"
 #include <Adafruit_NeoPixel.h>
 #include <Arduino.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 class LedDriver {
 public:
@@ -34,6 +36,9 @@ public:
   void setColor(uint32_t color);
   void setBrightness(uint8_t brightness);
   void setSpeed(int speed);
+  int getCurrentEffect();
+  uint8_t getBrightness() const { return currentBrightness; }
+  int getSpeed() const { return effectSpeed; }
 
   // Vehicle controls
   void setVehicleHeadlights(bool on);
@@ -43,9 +48,11 @@ public:
   void setModeIdle();
   void setModeAlarm(AlarmCarEffect carEff = ACE_BLINK,
                     LedEffect ledEff = RAINBOW);
+  bool isAlarmActive();
 
 private:
   Adafruit_NeoPixel strip;
+  SemaphoreHandle_t stateMutex;
   uint32_t lastUpdate;
   int animationStep;
   LedEffect currentEffect;
@@ -69,6 +76,8 @@ private:
   void sparkleEffect();
   void knightRiderEffect();
   void alarmEffect();
+  uint32_t makeSignalColor(uint8_t baseR, uint8_t baseG, uint8_t baseB,
+                           uint8_t signalBrightness);
 };
 
 #endif // LED_DRIVER_H

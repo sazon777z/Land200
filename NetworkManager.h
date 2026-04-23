@@ -8,12 +8,46 @@
 #include <WiFiUdp.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
+#include <time.h>
+
+struct WatchStateSnapshot {
+  String formattedTime = "--:--:--";
+  int hour = 0;
+  int minute = 0;
+  int second = 0;
+  int weekdayIndex = 4;
+  int dayOfMonth = 1;
+  int monthIndex = 1;
+  int year = 1970;
+
+  float temperature = 0.0f;
+  String weatherCondition = "--";
+  String weatherIcon = "";
+
+  bool connected = false;
+  bool apMode = false;
+  String apSSID = "";
+  String apPassword = "";
+  String ipAddress = "";
+
+  int timeZoneOffset = 5;
+  String weatherCity = "Almaty";
+
+  int alarmHour = 0;
+  int alarmMinute = 0;
+  int alarmSoundId = 1;
+  int alarmVolume = 20;
+  int alarmCarEffect = 1;
+  int alarmLedEffect = 1;
+  bool alarmEnabled = false;
+};
 
 class WatchNetworkManager {
 public:
   WatchNetworkManager();
   void begin();
-  void update(); // Handle NTP and Weather updates
+  void update();
+  WatchStateSnapshot getSnapshot();
 
   String getFormattedTime();
   int getHour();
@@ -31,25 +65,24 @@ public:
   String getApPassword();
   String getIpAddress();
 
-  // Settings getters (for UI sync)
   int getTimeZoneOffset();
   String getWeatherCity();
 
-  // Alarm settings
   void saveAlarm(int hour, int minute, int soundId, int carEff, int ledEff,
                  bool enabled);
   void saveAlarmVolume(int volume);
-  int getAlarmHour() { return alarmHour; }
-  int getAlarmMinute() { return alarmMinute; }
-  int getAlarmSoundId() { return alarmSoundId; }
-  int getAlarmVolume() { return alarmVolume; }
-  int getAlarmCarEffect() { return alarmCarEffect; }
-  int getAlarmLedEffect() { return alarmLedEffect; }
-  bool isAlarmEnabled() { return alarmEnabled; }
+  bool setAlarmEnabled(bool enabled);
+  bool toggleAlarmEnabled();
+  int getAlarmHour();
+  int getAlarmMinute();
+  int getAlarmSoundId();
+  int getAlarmVolume();
+  int getAlarmCarEffect();
+  int getAlarmLedEffect();
+  bool isAlarmEnabled();
   bool checkAlarmTrigger();
-  void resetAlarmTrigger(); // Manual stop
+  void resetAlarmTrigger();
 
-  // Settings setters
   void saveWiFiCredentials(String ssid, String pass);
   void saveLocalizationSettings(int timezoneOffset, String city);
 
@@ -59,33 +92,19 @@ private:
   Preferences preferences;
 
   unsigned long lastWeatherUpdate;
-  float currentTemp;
-  String currentCondition;
-  String currentIcon;
+  WatchStateSnapshot state;
+  SemaphoreHandle_t stateMutex;
+  int lastTriggerMinute;
 
-  // Localization
-  int timeOffset;
-  String weatherCity;
-
-  // Alarm state
-  int alarmHour;
-  int alarmMinute;
-  int alarmSoundId;
-  int alarmVolume;
-  int alarmCarEffect;
-  int alarmLedEffect;
-  bool alarmEnabled;
-  bool alarmTriggeredToday;
-  int lastTriggerMinute; // To prevent multiple triggers in one minute
-
-  bool apMode;
-
-  // Мутекс для общих ресурсов (static чтобы был один на все экземпляры, если их
-  // вдруг будет больше)
   static SemaphoreHandle_t systemMutex;
 
   void updateWeather();
   void setupAP();
+  void refreshTimeState();
+  void refreshConnectionState(bool connected, bool apMode,
+                              const String &ipAddress,
+                              const String &apSSID = "",
+                              const String &apPassword = "");
 };
 
 #endif // NETWORK_MANAGER_H

@@ -13,7 +13,7 @@
     <div class="background-glow"></div>
     <div class="container">
         <header>
-            <h1>LC200 Control</h1>
+            <h1>Toyota Landcruiser 200</h1>
             <div class="status-indicator online" id="connectionStatus"></div>
         </header>
 
@@ -40,6 +40,13 @@
             <!-- Alarm Settings -->
             <section class="glass-card">
                 <h2>Alarm</h2>
+                <div class="control-group switch-group">
+                    <label for="alarmEnabled">Status</label>
+                    <label class="switch">
+                        <input type="checkbox" id="alarmEnabled">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
                 <div class="control-group">
                     <label for="alarmTime">Set Time</label>
                     <input type="time" id="alarmTime">

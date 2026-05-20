@@ -59,39 +59,43 @@ static int prevDayOfMonth = -1;
 static int prevMonth = -1;
 static float prevTemp = -999.0f;
 static bool prevAlarmEnabled = false;
-static String prevCondition;
-static String prevIcon;
+static char prevCondition[48] = "";
+static char prevIcon[12] = "";
 static bool dashboardPrimed = false;
 static bool colonBright = true;
 
-WeatherKind detectWeatherKind(const String &iconCode) {
-  if (iconCode.length() < 2) {
+WeatherKind detectWeatherKind(const char *iconCode) {
+  if (!iconCode || strlen(iconCode) < 2) {
     return WeatherKind::Unknown;
   }
 
-  const String prefix = iconCode.substring(0, 2);
-  if (prefix == "01") {
+  if (strncmp(iconCode, "01", 2) == 0) {
     return WeatherKind::Clear;
   }
-  if (prefix == "02" || prefix == "03" || prefix == "04") {
+  if (strncmp(iconCode, "02", 2) == 0 || strncmp(iconCode, "03", 2) == 0 || strncmp(iconCode, "04", 2) == 0) {
     return WeatherKind::Clouds;
   }
-  if (prefix == "09" || prefix == "10") {
+  if (strncmp(iconCode, "09", 2) == 0 || strncmp(iconCode, "10", 2) == 0) {
     return WeatherKind::Rain;
   }
-  if (prefix == "11") {
+  if (strncmp(iconCode, "11", 2) == 0) {
     return WeatherKind::Thunder;
   }
-  if (prefix == "13") {
+  if (strncmp(iconCode, "13", 2) == 0) {
     return WeatherKind::Snow;
   }
-  if (prefix == "50") {
+  if (strncmp(iconCode, "50", 2) == 0) {
     return WeatherKind::Mist;
   }
   return WeatherKind::Unknown;
 }
 
-bool isDayWeather(const String &iconCode) { return iconCode.endsWith("d"); }
+bool isDayWeather(const char *iconCode) {
+  if (!iconCode) return false;
+  size_t len = strlen(iconCode);
+  if (len == 0) return false;
+  return iconCode[len - 1] == 'd';
+}
 
 void drawCloudShape(Arduino_GFX *target, int x, int y, uint16_t color) {
   target->fillCircle(x + 14, y + 18, 9, color);
@@ -122,7 +126,7 @@ void drawMoonShape(Arduino_GFX *target, int cx, int cy, int radius) {
 }
 
 void drawWeatherGlyph(Arduino_GFX *target, int x, int y,
-                      const String &iconCode) {
+                      const char *iconCode) {
   const WeatherKind kind = detectWeatherKind(iconCode);
   const bool day = isDayWeather(iconCode);
 
@@ -223,8 +227,8 @@ void DisplayDriver::clearMainSegments() {
   prevMonth = -1;
   prevTemp = -999.0f;
   prevAlarmEnabled = false;
-  prevCondition = "";
-  prevIcon = "";
+  prevCondition[0] = '\0';
+  prevIcon[0] = '\0';
   dashboardPrimed = false;
   colonBright = true;
 
@@ -245,8 +249,8 @@ void DisplayDriver::drawDashboard(const WatchStateSnapshot &snapshot) {
                            snapshot.dayOfMonth != prevDayOfMonth ||
                            snapshot.monthIndex != prevMonth ||
                            snapshot.alarmEnabled != prevAlarmEnabled ||
-                           snapshot.weatherCondition != prevCondition ||
-                           snapshot.weatherIcon != prevIcon;
+                           strcmp(snapshot.weatherCondition, prevCondition) != 0 ||
+                           strcmp(snapshot.weatherIcon, prevIcon) != 0;
 
   const bool timeChanged = !dashboardPrimed || snapshot.hour != prevHour ||
                            snapshot.minute != prevMinute ||
@@ -279,8 +283,8 @@ void DisplayDriver::drawDashboard(const WatchStateSnapshot &snapshot) {
   prevMonth = snapshot.monthIndex;
   prevTemp = snapshot.temperature;
   prevAlarmEnabled = snapshot.alarmEnabled;
-  prevCondition = snapshot.weatherCondition;
-  prevIcon = snapshot.weatherIcon;
+  snprintf(prevCondition, sizeof(prevCondition), "%s", snapshot.weatherCondition);
+  snprintf(prevIcon, sizeof(prevIcon), "%s", snapshot.weatherIcon);
   dashboardPrimed = true;
 }
 
@@ -461,8 +465,8 @@ String DisplayDriver::getMonthLabel(int monthIndex) {
   return String(kMonths[monthIndex - 1]);
 }
 
-String DisplayDriver::getConditionLabel(const String &condition,
-                                        const String &iconCode) {
+String DisplayDriver::getConditionLabel(const char *condition,
+                                        const char *iconCode) {
   const WeatherKind kind = detectWeatherKind(iconCode);
 
   switch (kind) {
@@ -483,14 +487,14 @@ String DisplayDriver::getConditionLabel(const String &condition,
     break;
   }
 
-  if (condition.length() > 0 && condition != "--") {
+  if (condition && strlen(condition) > 0 && strcmp(condition, "--") != 0) {
     return "\xD0\x9F\xD0\x9E\xD0\x93\xD0\x9E\xD0\x94\xD0\x90"; // ПОГОДА
   }
 
   return "\xD0\x9F\xD0\x9E\xD0\x93\xD0\x9E\xD0\x94\xD0\x90"; // ПОГОДА
 }
 
-void DisplayDriver::drawConnecting(String ssid) {
+void DisplayDriver::drawConnecting(const char *ssid) {
   (void)ssid;
   drawBackground();
   gfx->setTextColor(kColorText);
@@ -506,11 +510,11 @@ void DisplayDriver::drawConnecting(String ssid) {
   gfx->setFont(NULL);
 }
 
-void DisplayDriver::drawQRCode(String data, int startX, int startY, int scale) {
+void DisplayDriver::drawQRCode(const char *data, int startX, int startY, int scale) {
   QRCode qrcode;
   uint8_t version = 3;
   uint8_t qrcodeData[qrcode_getBufferSize(version)];
-  qrcode_initText(&qrcode, qrcodeData, version, ECC_LOW, data.c_str());
+  qrcode_initText(&qrcode, qrcodeData, version, ECC_LOW, data);
 
   gfx->fillRect(startX - 5, startY - 5, (qrcode.size * scale) + 10,
                 (qrcode.size * scale) + 10, WHITE);
@@ -525,18 +529,18 @@ void DisplayDriver::drawQRCode(String data, int startX, int startY, int scale) {
   }
 }
 
-void DisplayDriver::drawAPInfo(String ssid, String pass, String ip) {
+void DisplayDriver::drawAPInfo(const char *ssid, const char *pass, const char *ip) {
   (void)ip;
   drawBackground();
 
-  String qrData = "WIFI:S:" + ssid + ";T:WPA;P:" + pass + ";;";
+  String qrData = "WIFI:S:" + String(ssid) + ";T:WPA;P:" + String(pass) + ";;";
 
   const int qrScale = 4;
   const int qrSize = 29 * qrScale;
   const int qrX = 20;
   const int qrY = (kQrDisplayHeight - qrSize) / 2;
 
-  drawQRCode(qrData, qrX, qrY, qrScale);
+  drawQRCode(qrData.c_str(), qrX, qrY, qrScale);
 
   gfx->setFont(&FreeSans9pt7b);
   gfx->setTextSize(1);

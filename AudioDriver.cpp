@@ -13,8 +13,8 @@ void AudioDriver::begin() {
   // Инициализация Serial
   mySerial.begin(9600, SERIAL_8N1, PIN_AUDIO_RX, PIN_AUDIO_TX);
 
-  // Даем время на стабилизацию питания модуля
-  delay(1500);
+  // Даем время на стабилизацию питания модуля (сокращено с 1500 до 500 мс)
+  delay(500);
 
   // Используем (mySerial, false, false) - отключаем ACK и Reset
   // Это самый надежный способ для клонов, которые зависают при инициализации
@@ -94,13 +94,15 @@ void AudioDriver::executePlay(int trackNumber) {
 
   Serial.printf("Audio: playFolder(1, %d)\n", trackNumber);
   myDFPlayer.playFolder(1, trackNumber);
-  delay(150);
+  // Небольшая пауза для приема команды модулем (не блокирует основной поток —
+  // вызов происходит уже в TaskNetwork, задача которого может отдать CPU)
+  vTaskDelay(pdMS_TO_TICKS(150));
 }
 
 void AudioDriver::executeStop() {
   Serial.println("Audio: stop()");
   myDFPlayer.stop();
-  delay(100);
+  vTaskDelay(pdMS_TO_TICKS(50));
 }
 
 void AudioDriver::executeVolume(int volume) {
@@ -109,7 +111,7 @@ void AudioDriver::executeVolume(int volume) {
   Serial.printf("Audio: volume(%d)\n", volume);
   myDFPlayer.volume(volume);
   lastVolume = volume;
-  delay(100);
+  // Пауза не нужна — модуль принимает команду без задержки подтверждения
 }
 
 void AudioDriver::printDetail(uint8_t type, int value) {

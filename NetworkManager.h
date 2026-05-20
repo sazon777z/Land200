@@ -2,16 +2,14 @@
 #define NETWORK_MANAGER_H
 
 #include <HTTPClient.h>
-#include <NTPClient.h>
 #include <Preferences.h>
 #include <WiFi.h>
-#include <WiFiUdp.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <time.h>
 
 struct WatchStateSnapshot {
-  String formattedTime = "--:--:--";
+  char formattedTime[12] = "--:--:--";
   int hour = 0;
   int minute = 0;
   int second = 0;
@@ -21,17 +19,17 @@ struct WatchStateSnapshot {
   int year = 1970;
 
   float temperature = 0.0f;
-  String weatherCondition = "--";
-  String weatherIcon = "";
+  char weatherCondition[48] = "--";
+  char weatherIcon[12] = "";
 
   bool connected = false;
   bool apMode = false;
-  String apSSID = "";
-  String apPassword = "";
-  String ipAddress = "";
+  char apSSID[33] = "";
+  char apPassword[65] = "";
+  char ipAddress[16] = "";
 
   int timeZoneOffset = 5;
-  String weatherCity = "Almaty";
+  char weatherCity[48] = "Almaty";
 
   int alarmHour = 0;
   int alarmMinute = 0;
@@ -87,8 +85,6 @@ public:
   void saveLocalizationSettings(int timezoneOffset, String city);
 
 private:
-  WiFiUDP ntpUDP;
-  NTPClient *timeClient;
   Preferences preferences;
 
   unsigned long lastWeatherUpdate;
@@ -102,9 +98,9 @@ private:
   void setupAP();
   void refreshTimeState();
   void refreshConnectionState(bool connected, bool apMode,
-                              const String &ipAddress,
-                              const String &apSSID = "",
-                              const String &apPassword = "");
+                              const char *ipAddress,
+                              const char *apSSID = "",
+                              const char *apPassword = "");
 };
 
 #endif // NETWORK_MANAGER_H

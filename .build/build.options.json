@@ -1,0 +1,9 @@
+{
+  "additionalFiles": "..\\..\\..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..,..\\..",
+  "compiler.optimization_flags": "-Os",
+  "customBuildProperties": "",
+  "fqbn": "esp32:esp32:esp32c3",
+  "hardwareFolders": "C:\\Users\\JZX\\AppData\\Local\\Arduino15\\packages",
+  "otherLibrariesFolders": "C:\\Users\\JZX\\Documents\\Arduino\\libraries",
+  "sketchLocation": "C:\\Users\\JZX\\Documents\\Arduino\\Land_Cruiser"
+}

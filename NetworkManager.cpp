@@ -7,9 +7,7 @@
 SemaphoreHandle_t WatchNetworkManager::systemMutex = NULL;
 
 WatchNetworkManager::WatchNetworkManager()
-    : timeClient(new NTPClient(ntpUDP, NTP_SERVER, GMT_OFFSET_SEC,
-                               DAYLIGHT_OFFSET_SEC)),
-      lastWeatherUpdate(0), state(), stateMutex(NULL), lastTriggerMinute(-1) {}
+    : lastWeatherUpdate(0), state(), stateMutex(NULL), lastTriggerMinute(-1) {}
 
 void WatchNetworkManager::begin() {
   if (systemMutex == NULL) {
@@ -50,7 +48,7 @@ void WatchNetworkManager::begin() {
 
   if (stateMutex != NULL && xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
     state.timeZoneOffset = timeOffset;
-    state.weatherCity = weatherCity;
+    snprintf(state.weatherCity, sizeof(state.weatherCity), "%s", weatherCity.c_str());
     state.alarmHour = alarmHour;
     state.alarmMinute = alarmMinute;
     state.alarmSoundId = alarmSoundId;
@@ -60,9 +58,9 @@ void WatchNetworkManager::begin() {
     state.alarmEnabled = alarmEnabled;
     state.connected = false;
     state.apMode = false;
-    state.ipAddress = "";
-    state.apSSID = "";
-    state.apPassword = "";
+    state.ipAddress[0] = '\0';
+    state.apSSID[0] = '\0';
+    state.apPassword[0] = '\0';
     xSemaphoreGive(stateMutex);
   }
 
@@ -103,14 +101,10 @@ void WatchNetworkManager::begin() {
       MDNS.addService("http", "tcp", 80);
     }
 
-    if (timeClient != NULL) {
-      timeClient->setTimeOffset(timeOffset * 3600);
-      timeClient->begin();
-      timeClient->update();
-      refreshTimeState();
-    }
+    configTime(timeOffset * 3600, 0, NTP_SERVER);
+    refreshTimeState();
 
-    refreshConnectionState(true, false, WiFi.localIP().toString());
+    refreshConnectionState(true, false, WiFi.localIP().toString().c_str());
   } else {
     Serial.println("\nConnection failed. Starting AP fallback.");
     setupAP();
@@ -147,14 +141,14 @@ void WatchNetworkManager::setupAP() {
   Serial.print("IP: ");
   Serial.println(WiFi.softAPIP());
 
-  refreshConnectionState(false, true, WiFi.softAPIP().toString(), apSSID,
-                         apPassword);
+  refreshConnectionState(false, true, WiFi.softAPIP().toString().c_str(), apSSID.c_str(),
+                         apPassword.c_str());
 }
 
 void WatchNetworkManager::refreshConnectionState(bool connected, bool apMode,
-                                                 const String &ipAddress,
-                                                 const String &apSSID,
-                                                 const String &apPassword) {
+                                                 const char *ipAddress,
+                                                 const char *apSSID,
+                                                 const char *apPassword) {
   if (stateMutex == NULL) {
     return;
   }
@@ -162,27 +156,33 @@ void WatchNetworkManager::refreshConnectionState(bool connected, bool apMode,
   if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
     state.connected = connected;
     state.apMode = apMode;
-    state.ipAddress = ipAddress;
-    state.apSSID = apSSID;
-    state.apPassword = apPassword;
+    if (ipAddress) {
+      snprintf(state.ipAddress, sizeof(state.ipAddress), "%s", ipAddress);
+    }
+    if (apSSID) {
+      snprintf(state.apSSID, sizeof(state.apSSID), "%s", apSSID);
+    }
+    if (apPassword) {
+      snprintf(state.apPassword, sizeof(state.apPassword), "%s", apPassword);
+    }
     xSemaphoreGive(stateMutex);
   }
 }
 
 void WatchNetworkManager::refreshTimeState() {
-  if (timeClient == NULL || stateMutex == NULL) {
+  if (stateMutex == NULL) {
     return;
   }
 
-  time_t rawTime = timeClient->getEpochTime();
+  time_t rawTime = time(nullptr);
   struct tm timeInfo = {};
   localtime_r(&rawTime, &timeInfo);
 
   if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
-    state.formattedTime = timeClient->getFormattedTime();
-    state.hour = timeClient->getHours();
-    state.minute = timeClient->getMinutes();
-    state.second = timeClient->getSeconds();
+    strftime(state.formattedTime, sizeof(state.formattedTime), "%H:%M:%S", &timeInfo);
+    state.hour = timeInfo.tm_hour;
+    state.minute = timeInfo.tm_min;
+    state.second = timeInfo.tm_sec;
     state.weekdayIndex = timeInfo.tm_wday;
     state.dayOfMonth = timeInfo.tm_mday > 0 ? timeInfo.tm_mday : 1;
     state.monthIndex = timeInfo.tm_mon >= 0 ? timeInfo.tm_mon + 1 : 1;
@@ -195,12 +195,8 @@ void WatchNetworkManager::update() {
   const bool apMode = isAPMode();
 
   if (!apMode && WiFi.status() == WL_CONNECTED) {
-    refreshConnectionState(true, false, WiFi.localIP().toString());
-
-    if (timeClient != NULL) {
-      timeClient->update();
-      refreshTimeState();
-    }
+    refreshConnectionState(true, false, WiFi.localIP().toString().c_str());
+    refreshTimeState();
 
     if (millis() - lastWeatherUpdate > WEATHER_UPDATE_INTERVAL_MS ||
         lastWeatherUpdate == 0) {
@@ -237,7 +233,7 @@ String WatchNetworkManager::getFormattedTime() {
 
   String formattedTime = "--:--:--";
   if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
-    formattedTime = state.formattedTime;
+    formattedTime = String(state.formattedTime);
     xSemaphoreGive(stateMutex);
   }
 
@@ -321,7 +317,7 @@ String WatchNetworkManager::getWeatherCondition() {
 
   String value = "--";
   if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
-    value = state.weatherCondition;
+    value = String(state.weatherCondition);
     xSemaphoreGive(stateMutex);
   }
 
@@ -335,7 +331,7 @@ String WatchNetworkManager::getWeatherIcon() {
 
   String value;
   if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
-    value = state.weatherIcon;
+    value = String(state.weatherIcon);
     xSemaphoreGive(stateMutex);
   }
 
@@ -377,7 +373,7 @@ String WatchNetworkManager::getApSSID() {
 
   String value;
   if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
-    value = state.apSSID;
+    value = String(state.apSSID);
     xSemaphoreGive(stateMutex);
   }
 
@@ -391,7 +387,7 @@ String WatchNetworkManager::getApPassword() {
 
   String value;
   if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
-    value = state.apPassword;
+    value = String(state.apPassword);
     xSemaphoreGive(stateMutex);
   }
 
@@ -405,7 +401,7 @@ String WatchNetworkManager::getIpAddress() {
 
   String value;
   if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
-    value = state.ipAddress;
+    value = String(state.ipAddress);
     xSemaphoreGive(stateMutex);
   }
 
@@ -428,7 +424,7 @@ void WatchNetworkManager::saveLocalizationSettings(int timezoneOffset,
                                                    String city) {
   if (stateMutex != NULL && xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
     state.timeZoneOffset = timezoneOffset;
-    state.weatherCity = city;
+    snprintf(state.weatherCity, sizeof(state.weatherCity), "%s", city.c_str());
     xSemaphoreGive(stateMutex);
   }
 
@@ -440,9 +436,8 @@ void WatchNetworkManager::saveLocalizationSettings(int timezoneOffset,
     xSemaphoreGive(systemMutex);
   }
 
-  if (!isAPMode() && WiFi.status() == WL_CONNECTED && timeClient != NULL) {
-    timeClient->setTimeOffset(timezoneOffset * 3600);
-    timeClient->forceUpdate();
+  if (!isAPMode() && WiFi.status() == WL_CONNECTED) {
+    configTime(timezoneOffset * 3600, 0, NTP_SERVER);
     refreshTimeState();
     updateWeather();
   }
@@ -650,8 +645,8 @@ bool WatchNetworkManager::checkAlarmTrigger() {
 
     if (state.hour == state.alarmHour && state.minute == state.alarmMinute) {
       if (lastTriggerMinute != state.minute) {
-        lastTriggerMinute = state.minute;
-        shouldTrigger = true;
+         lastTriggerMinute = state.minute;
+         shouldTrigger = true;
       }
     } else if (lastTriggerMinute != -1) {
       lastTriggerMinute = -1;
@@ -691,7 +686,7 @@ String WatchNetworkManager::getWeatherCity() {
 
   String value = "Almaty";
   if (xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
-    value = state.weatherCity;
+    value = String(state.weatherCity);
     xSemaphoreGive(stateMutex);
   }
 
@@ -703,13 +698,13 @@ void WatchNetworkManager::updateWeather() {
     return;
   }
 
-  String city = "Almaty";
+  char city[48] = "Almaty";
   if (stateMutex != NULL && xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
-    city = state.weatherCity;
+    snprintf(city, sizeof(city), "%s", state.weatherCity);
     xSemaphoreGive(stateMutex);
   }
 
-  String encodedCity = city;
+  String encodedCity = String(city);
   encodedCity.replace(" ", "%20");
 
   HTTPClient http;
@@ -726,7 +721,8 @@ void WatchNetworkManager::updateWeather() {
 
   if (httpCode == HTTP_CODE_OK) {
     String payload = http.getString();
-    DynamicJsonDocument doc(2048);
+    // Использование компактного документа для сохранения RAM на стеке
+    StaticJsonDocument<768> doc;
     DeserializationError error = deserializeJson(doc, payload);
 
     if (!error) {
@@ -738,8 +734,8 @@ void WatchNetworkManager::updateWeather() {
         if (stateMutex != NULL &&
             xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
           state.temperature = temperature;
-          state.weatherCondition = condition;
-          state.weatherIcon = icon;
+          snprintf(state.weatherCondition, sizeof(state.weatherCondition), "%s", condition.c_str());
+          snprintf(state.weatherIcon, sizeof(state.weatherIcon), "%s", icon.c_str());
           xSemaphoreGive(stateMutex);
         }
 

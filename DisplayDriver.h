@@ -20,9 +20,9 @@ public:
   DisplayDriver();
   void begin();
   void drawDashboard(const WatchStateSnapshot &snapshot);
-  void drawConnecting(String ssid);
-  void drawQRCode(String data, int startX, int startY, int scale);
-  void drawAPInfo(String ssid, String pass, String ip);
+  void drawConnecting(const char *ssid);
+  void drawQRCode(const char *data, int startX, int startY, int scale);
+  void drawAPInfo(const char *ssid, const char *pass, const char *ip);
   void setBrightness(uint8_t brightness);
   uint8_t getBrightness() const { return currentBrightness; }
   void clearMainSegments();
@@ -42,7 +42,7 @@ private:
   String formatTemperature(float temp);
   String getWeekdayLabel(int weekdayIndex);
   String getMonthLabel(int monthIndex);
-  String getConditionLabel(const String &condition, const String &iconCode);
+  String getConditionLabel(const char *condition, const char *iconCode);
 };
 
 #endif // DISPLAY_DRIVER_H

@@ -58,7 +58,7 @@ void WebManager::setupRoutes() {
   // API Status
   server.on("/api/status", HTTP_GET, [this]() {
     const WatchStateSnapshot snapshot = net->getSnapshot();
-    DynamicJsonDocument doc(512);
+    StaticJsonDocument<512> doc;
 
     // Format temperature with 1 decimal place
     char tempStr[10];
@@ -117,7 +117,7 @@ void WebManager::setupRoutes() {
         server.send(413, "text/plain", "Payload too large");
         return;
       }
-      DynamicJsonDocument doc(1024);
+      StaticJsonDocument<256> doc;
       DeserializationError error = deserializeJson(doc, body);
       if (error) {
         server.send(400, "text/plain", "Invalid JSON");
@@ -282,7 +282,7 @@ void WebManager::setupRoutes() {
         server.send(413, "text/plain", "Payload too large");
         return;
       }
-      DynamicJsonDocument doc(512);
+      StaticJsonDocument<256> doc;
       DeserializationError error = deserializeJson(doc, body);
       if (error) {
         server.send(400, "text/plain", "Invalid JSON");
@@ -309,7 +309,7 @@ void WebManager::setupRoutes() {
         server.send(413, "text/plain", "Payload too large");
         return;
       }
-      DynamicJsonDocument doc(512);
+      StaticJsonDocument<256> doc;
       DeserializationError error = deserializeJson(doc, body);
       if (error) {
         server.send(400, "text/plain", "Invalid JSON");

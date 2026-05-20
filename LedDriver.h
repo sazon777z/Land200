@@ -44,6 +44,7 @@ public:
   void setVehicleHeadlights(bool on);
   void setVehicleTaillights(bool on);
   void setTurnSignal(TurnSignal mode);
+  void flashHighBeam(); // 3 быстрых моргания дальним светом
 
   void setModeIdle();
   void setModeAlarm(AlarmCarEffect carEff = ACE_BLINK,
@@ -67,6 +68,12 @@ private:
   bool headlightsOn;
   bool taillightsOn;
   TurnSignal turnSignalMode;
+
+  // High beam flash state
+  bool flashActive;
+  int flashCount;
+  uint32_t flashLastMs;
+  bool flashPhase;
 
   void rainbowEffect();
   void policeEffect();

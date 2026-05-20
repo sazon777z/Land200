@@ -245,6 +245,9 @@ const char index_html[] PROGMEM = R"rawliteral(
                             <button class="icon-btn btn-hazard" id="btnHazard" title="Аварийка">
                                 <svg viewBox="0 0 24 24"><path d="M12,2L1,21H23L12,2M12,6L19.53,19H4.47L12,6M11,10V14H13V10H11M11,16V18H13V16H11Z"/></svg>
                             </button>
+                            <button class="icon-btn btn-highbeam" id="btnHighBeam" title="Дальний (3 моргания)" onclick="flashHighBeam()">
+                                <svg viewBox="0 0 24 24"><path d="M13,4.83V19.17c3.42-0.41,6.04-3.52,6.04-7.17S16.42,5.24,13,4.83z M1,4h8v2H1V4z M1,8h8v2H1V8z M1,12h8v2H1V12z M1,16h8v2H1V16z M1,20h8v2H1V20z"/></svg>
+                            </button>
                         </div>
                     </div>
                 </section>
@@ -398,6 +401,17 @@ input[type="time"], select, input[type="range"], input[type="text"], input[type=
 .icon-btn.btn-hazard.active svg {
     fill: #fff;
 }
+.icon-btn.btn-highbeam svg {
+    fill: rgba(255, 220, 50, 0.7);
+}
+.icon-btn.btn-highbeam.active {
+    background: #ffdc32;
+    border-color: #ffdc32;
+    box-shadow: 0 0 18px rgba(255, 220, 50, 0.6);
+}
+.icon-btn.btn-highbeam.active svg {
+    fill: #1a1200;
+}
 @media (max-width: 380px) {
     .light-controls-grid { gap: 5px; }
     .icon-btn { width: 45px; height: 45px; padding: 8px; }
@@ -464,6 +478,7 @@ document.addEventListener('DOMContentLoaded', () => {
     addListener('btnTurnLeft', 'click', () => toggleTurn(1));
     addListener('btnTurnRight', 'click', () => toggleTurn(2));
     addListener('btnHazard', 'click', () => toggleTurn(3));
+    addListener('btnHighBeam', 'click', flashHighBeam);
 });
 
 function updateField(id, newVal) {
@@ -516,6 +531,14 @@ function toggleTurn(mode) {
     else currentTS = mode;
     updateVisuals();
     fetch('/api/settings/turn_signal?mode=' + currentTS);
+}
+
+function flashHighBeam() {
+    const btn = document.getElementById('btnHighBeam');
+    btn.classList.add('active');
+    fetch('/api/settings/car_light_flash');
+    // Подсвечиваем кнопку на время анимации (3×160мс ≈ 600мс + запас)
+    setTimeout(() => btn.classList.remove('active'), 700);
 }
 
 function updateVisuals() {

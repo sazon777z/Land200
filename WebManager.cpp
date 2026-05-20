@@ -267,6 +267,12 @@ void WebManager::setupRoutes() {
     }
   });
 
+  // API High Beam Flash (3 быстрых моргания)
+  server.on("/api/settings/car_light_flash", HTTP_GET, [this]() {
+    led->flashHighBeam();
+    server.send(200, "text/plain", "OK");
+  });
+
   // API Settings WiFi Reset
   server.on("/api/settings/wifi_reset", HTTP_GET, [this]() {
     net->saveWiFiCredentials("", ""); // Clear credentials

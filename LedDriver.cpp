@@ -5,7 +5,8 @@ LedDriver::LedDriver()
       lastUpdate(0), animationStep(0), currentEffect(OFF), solidColor(0x00D2FF),
       currentBrightness(150), effectSpeed(30), alarmState(false),
       alarmCarEff(ACE_BLINK), alarmLedEff(RAINBOW), headlightsOn(false),
-      taillightsOn(false), turnSignalMode(TS_OFF) {}
+      taillightsOn(false), turnSignalMode(TS_OFF),
+      flashActive(false), flashCount(0), flashLastMs(0), flashPhase(false) {}
 
 void LedDriver::begin() {
   if (stateMutex == NULL) {
@@ -73,8 +74,33 @@ void LedDriver::update() {
   if (alarmState) {
     alarmEffect();
   } else {
+    // --- Обычный режим (без будильника) ---
     uint32_t frontColor = headlightsOn ? strip.Color(255, 255, 255) : 0;
-    uint32_t rearColor = taillightsOn ? strip.Color(255, 0, 0) : 0;
+    uint32_t rearColor  = taillightsOn ? strip.Color(255, 0, 0)     : 0;
+
+    // --- Обработка неблокирующей анимации дальнего света ---
+    if (flashActive) {
+      const uint32_t now = millis();
+      // Период: 80мс вкл, 80мс выкл
+      if (now - flashLastMs >= 80) {
+        flashLastMs = now;
+        flashPhase = !flashPhase;
+        if (!flashPhase) {
+          // Закончился один полный период (ON→OFF)
+          flashCount++;
+          if (flashCount >= 3) {
+            flashActive = false;
+          }
+        }
+      }
+      // Во время вспышки переопределяем frontColor на яркий белый
+      if (flashPhase) {
+        frontColor = strip.Color(255, 255, 255);
+      } else {
+        // Между вспышками возвращаемся к базовому состоянию (headlightsOn)
+        frontColor = headlightsOn ? strip.Color(255, 255, 255) : 0;
+      }
+    }
 
     for (int i = LED_HEAD_START; i <= LED_HEAD_END; i++) {
       strip.setPixelColor(i, frontColor);
@@ -232,6 +258,23 @@ void LedDriver::setTurnSignal(TurnSignal mode) {
   }
 
   turnSignalMode = mode;
+}
+
+void LedDriver::flashHighBeam() {
+  if (stateMutex != NULL &&
+      xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    flashActive = true;
+    flashCount  = 0;
+    flashPhase  = true;           // Начинаем с включённого света
+    flashLastMs = millis();
+    xSemaphoreGive(stateMutex);
+    return;
+  }
+  // фоллбэк без мьютекса
+  flashActive = true;
+  flashCount  = 0;
+  flashPhase  = true;
+  flashLastMs = millis();
 }
 
 void LedDriver::setModeIdle() {

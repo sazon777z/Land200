@@ -6,7 +6,9 @@ LedDriver::LedDriver()
       currentBrightness(150), effectSpeed(30), alarmState(false),
       alarmCarEff(ACE_BLINK), alarmLedEff(RAINBOW), headlightsOn(false),
       taillightsOn(false), turnSignalMode(TS_OFF),
-      flashActive(false), flashCount(0), flashLastMs(0), flashPhase(false) {}
+      flashActive(false), flashCount(0), flashLastMs(0), flashPhase(false),
+      hazardFlashActive(false), hazardFlashCount(0), hazardFlashMaxCount(0),
+      hazardFlashLastMs(0), hazardFlashPhase(false) {}
 
 void LedDriver::begin() {
   if (stateMutex == NULL) {
@@ -109,7 +111,29 @@ void LedDriver::update() {
       strip.setPixelColor(i, rearColor);
     }
 
-    if (turnSignalMode != TS_OFF) {
+    // --- Обработка временного мигания аварийкой (1 или 2 раза по 150 мс) ---
+    if (hazardFlashActive) {
+      const uint32_t now = millis();
+      if (now - hazardFlashLastMs >= 150) {
+        hazardFlashLastMs = now;
+        hazardFlashPhase = !hazardFlashPhase;
+        if (!hazardFlashPhase) {
+          hazardFlashCount++;
+          if (hazardFlashCount >= hazardFlashMaxCount) {
+            hazardFlashActive = false;
+          }
+        }
+      }
+
+      if (hazardFlashPhase) {
+        uint32_t amberHead = strip.Color(255, 45, 0);
+        uint32_t amberTail = strip.Color(255, 45, 0);
+        strip.setPixelColor(10, amberHead);
+        strip.setPixelColor(11, amberHead);
+        strip.setPixelColor(8, amberTail);
+        strip.setPixelColor(9, amberTail);
+      }
+    } else if (turnSignalMode != TS_OFF) {
       uint32_t ms = millis() % 700;
       uint8_t amberBright = 0;
 
@@ -275,6 +299,24 @@ void LedDriver::flashHighBeam() {
   flashCount  = 0;
   flashPhase  = true;
   flashLastMs = millis();
+}
+
+void LedDriver::flashHazard(int count) {
+  if (stateMutex != NULL &&
+      xSemaphoreTake(stateMutex, portMAX_DELAY) == pdTRUE) {
+    hazardFlashActive = true;
+    hazardFlashCount  = 0;
+    hazardFlashMaxCount = count;
+    hazardFlashPhase  = true;
+    hazardFlashLastMs = millis();
+    xSemaphoreGive(stateMutex);
+    return;
+  }
+  hazardFlashActive = true;
+  hazardFlashCount  = 0;
+  hazardFlashMaxCount = count;
+  hazardFlashPhase  = true;
+  hazardFlashLastMs = millis();
 }
 
 void LedDriver::setModeIdle() {

@@ -83,6 +83,9 @@ const char index_html[] PROGMEM = R"rawliteral(
                                 <option value="5">Звук 5</option>
                                 <option value="6">Звук 6</option>
                                 <option value="7">Звук 7</option>
+                                <option value="8">Звук 8</option>
+                                <option value="9">Звук 9</option>
+                                <option value="10">Звук 10</option>
                             </select>
                         </div>
                         <div class="control-group" style="margin:0;">

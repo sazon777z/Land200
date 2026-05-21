@@ -62,6 +62,13 @@ void AudioDriver::playAlarmSound(int trackNumber) {
   xQueueSend(audioQueue, &cmd, 0);
 }
 
+void AudioDriver::playFolderTrack(int folder, int trackNumber) {
+  if (audioQueue == NULL)
+    return;
+  AudioCommand cmd = {CMD_PLAY_FOLDER_TRACK, (folder << 16) | (trackNumber & 0xFFFF)};
+  xQueueSend(audioQueue, &cmd, 0);
+}
+
 void AudioDriver::processQueue() {
   if (audioQueue == NULL || !isReady)
     return;
@@ -82,6 +89,9 @@ void AudioDriver::processQueue() {
     case CMD_PLAY_ALARM:
       executePlay(cmd.data);
       break;
+    case CMD_PLAY_FOLDER_TRACK:
+      executePlayFolderTrack(cmd.data >> 16, cmd.data & 0xFFFF);
+      break;
     }
   }
 }
@@ -89,13 +99,24 @@ void AudioDriver::processQueue() {
 void AudioDriver::executePlay(int trackNumber) {
   if (trackNumber < 1)
     trackNumber = 1;
-  if (trackNumber > 7)
-    trackNumber = 7;
+  if (trackNumber > 10)
+    trackNumber = 10;
 
   Serial.printf("Audio: playFolder(1, %d)\n", trackNumber);
   myDFPlayer.playFolder(1, trackNumber);
   // Небольшая пауза для приема команды модулем (не блокирует основной поток —
   // вызов происходит уже в TaskNetwork, задача которого может отдать CPU)
+  vTaskDelay(pdMS_TO_TICKS(150));
+}
+
+void AudioDriver::executePlayFolderTrack(int folder, int trackNumber) {
+  if (folder < 1)
+    folder = 1;
+  if (trackNumber < 1)
+    trackNumber = 1;
+
+  Serial.printf("Audio: playFolder(%d, %d)\n", folder, trackNumber);
+  myDFPlayer.playFolder(folder, trackNumber);
   vTaskDelay(pdMS_TO_TICKS(150));
 }
 

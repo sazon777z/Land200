@@ -95,7 +95,7 @@ void WebManager::setupRoutes() {
   server.on("/api/sound/test", HTTP_GET, [this]() {
     if (server.hasArg("id")) {
       const WatchStateSnapshot snapshot = net->getSnapshot();
-      int soundId = constrain(server.arg("id").toInt(), 1, 7);
+      int soundId = constrain(server.arg("id").toInt(), 1, 10);
       audio->setVolume(snapshot.alarmVolume);
       audio->playTrack(soundId);
     }
@@ -125,7 +125,7 @@ void WebManager::setupRoutes() {
       }
 
       String time = doc["time"]; // Format "HH:MM"
-      int sound = constrain(doc["sound"] | snapshot.alarmSoundId, 1, 7);
+      int sound = constrain(doc["sound"] | snapshot.alarmSoundId, 1, 10);
       int carEff = constrain(doc["carEff"] | snapshot.alarmCarEffect, 0,
                              kMaxAlarmCarEffect);
       int ledEff =

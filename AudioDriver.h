@@ -8,7 +8,7 @@
 #include <freertos/queue.h>
 
 // Типы команд для аудио-очереди
-enum AudioCmdType { CMD_PLAY, CMD_STOP, CMD_SET_VOLUME, CMD_PLAY_ALARM };
+enum AudioCmdType { CMD_PLAY, CMD_STOP, CMD_SET_VOLUME, CMD_PLAY_ALARM, CMD_PLAY_FOLDER_TRACK };
 
 struct AudioCommand {
   AudioCmdType type;
@@ -23,6 +23,7 @@ public:
   void stop();
   void setVolume(uint8_t volume);
   void playAlarmSound(int trackNumber);
+  void playFolderTrack(int folder, int trackNumber);
 
   // Метод для обработки очереди (вызывается в отдельной задаче)
   void processQueue();
@@ -38,6 +39,7 @@ private:
   void executePlay(int track);
   void executeStop();
   void executeVolume(int vol);
+  void executePlayFolderTrack(int folder, int trackNumber);
 };
 
 #endif // AUDIO_DRIVER_H

@@ -24,6 +24,7 @@ SemaphoreHandle_t displayMutex;
 namespace {
 constexpr unsigned long kButtonDebounceMs = 40;
 constexpr unsigned long kDoublePressWindowMs = 350;
+bool carArmed = false;
 
 void stopAlarmOutput() {
   audio.stop();
@@ -89,6 +90,16 @@ void checkButton() {
       now - firstClickAtMs > kDoublePressWindowMs) {
     clickCount = 0;
     firstClickAtMs = 0;
+
+    carArmed = !carArmed;
+    Serial.printf("Button Single Press: Car %s\n", carArmed ? "Armed" : "Disarmed");
+    if (carArmed) {
+      audio.playFolderTrack(2, 1); // Звук 001 в папке 02
+      led.flashHazard(1);          // Моргает 1 раз
+    } else {
+      audio.playFolderTrack(2, 2); // Звук 002 в папке 02
+      led.flashHazard(2);          // Моргает 2 раза
+    }
   }
 }
 
